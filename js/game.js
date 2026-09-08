@@ -40,7 +40,7 @@ const Game = (() => {
   let onFinish = null, onChainAdvance = null;
   let lyricsCtl = null;
   let spectrumData = null;
-  let shake = 0, camBaseY = 2.0, camBaseZ = 5.6;
+  let shake = 0, camKick = 0, camBaseY = 2.0, camBaseZ = 5.6;
   let paletteHex = [0x7c5cff, 0xff5ca8, 0x5cf0ff];
 
   /* ================= init ================= */
@@ -100,6 +100,8 @@ const Game = (() => {
     buildLanes(4);
     buildSpectrum(24);
     buildNotePool();
+    buildBackdrop();
+    buildHopper();
 
     pools = VFX.createPools(scene, THREE);
     clock = new THREE.Clock();
@@ -157,27 +159,223 @@ const Game = (() => {
         new THREE.BoxGeometry(0.17, 1, 0.17),
         new THREE.MeshStandardMaterial({ color: 0x7c5cff, emissive: 0x7c5cff, emissiveIntensity: 0.5 })
       );
-      bar.position.set(side * (2.5 + (idx % 3) * 0.42), 0, 1.6 - idx * 1.25);
+      bar.position.set(side * (3.5 + (idx % 3) * 0.55), 0, 0.4 - idx * 1.7);
       bar.scale.y = 0.1;
       scene.add(bar);
       spectrumBars.push(bar);
     }
   }
 
+  /* ---------- background: depth behind the track ---------- */
+  let starField, backGlow, parallax = [], streaks = [];
+  let noteDetail = 1;   // 0 = body only, 1 = +glow, 2 = +trail/ring
+
+  function buildBackdrop() {
+    // drifting dust — one Points object, effectively free to render
+    const count = 260;
+    const pos = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i * 3]     = (Math.random() - 0.5) * 46;
+      pos[i * 3 + 1] = Math.random() * 20 - 2;
+      pos[i * 3 + 2] = -Math.random() * 46 + 4;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    starField = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: 0x9a8cff, size: 0.09, transparent: true, opacity: 0.5,
+      blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+    }));
+    scene.add(starField);
+
+    // the ambient glow that breathes on the beat, sitting behind the track
+    backGlow = new THREE.Mesh(
+      new THREE.PlaneGeometry(46, 26),
+      new THREE.MeshBasicMaterial({
+        color: 0x7c5cff, transparent: true, opacity: 0.1,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      })
+    );
+    backGlow.position.set(0, 4, -30);
+    scene.add(backGlow);
+
+    // parallax rings drift slower than the track, so depth reads as depth
+    for (let i = 0; i < 5; i++) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(2.4 + i * 1.1, 2.5 + i * 1.1, 6),
+        new THREE.MeshBasicMaterial({
+          color: 0x5cf0ff, transparent: true, opacity: 0.07,
+          blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+        })
+      );
+      ring.position.set((i % 2 ? 1 : -1) * (5 + i * 1.6), 2.6 + (i % 3) * 2.2, -18 - i * 4.5);
+      ring.rotation.z = Math.random() * Math.PI;
+      ring.userData.spin = (Math.random() - 0.5) * 0.12;
+      ring.userData.depth = 0.16 + i * 0.07;   // parallax factor
+      scene.add(ring);
+      parallax.push(ring);
+    }
+
+    // light streaks flying past the corridor
+    for (let i = 0; i < 8; i++) {
+      const s = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.05, 5),
+        new THREE.MeshBasicMaterial({
+          color: 0x5cf0ff, transparent: true, opacity: 0.16,
+          blending: THREE.AdditiveBlending, depthWrite: false,
+        })
+      );
+      s.rotation.x = -Math.PI / 2;
+      s.position.set((Math.random() - 0.5) * 26, 0.4 + Math.random() * 6, -Math.random() * 40);
+      s.userData.speed = 8 + Math.random() * 16;
+      scene.add(s);
+      streaks.push(s);
+    }
+  }
+
+  function updateBackdrop(dt, pulse, level) {
+    if (starField) {
+      starField.rotation.y += dt * 0.012;
+      starField.position.z = (starField.position.z + dt * 1.4) % 8;
+      starField.material.opacity = 0.34 + pulse * 0.3 + level * 0.2;
+    }
+    if (backGlow) {
+      // beat-synced ambient pulse behind the track
+      const target = 0.08 + pulse * 0.13 + level * 0.12 + (lastFlowState ? 0.1 : 0);
+      backGlow.material.opacity += (target - backGlow.material.opacity) * Math.min(1, dt * 10);
+      backGlow.scale.setScalar(1 + pulse * 0.06);
+    }
+    for (const r of parallax) {
+      r.rotation.z += r.userData.spin * dt;
+      r.position.z += dt * r.userData.depth * 6;
+      if (r.position.z > 6) r.position.z = -40;
+      r.material.opacity = 0.05 + pulse * 0.05;
+    }
+    if (tier !== "low") {
+      for (const s of streaks) {
+        s.position.z += dt * s.userData.speed;
+        if (s.position.z > 8) {
+          s.position.z = -42;
+          s.position.x = (Math.random() - 0.5) * 26;
+          s.position.y = 0.4 + Math.random() * 6;
+        }
+        s.material.opacity = 0.08 + pulse * 0.16;
+      }
+    }
+  }
+
+  /* ---------- Tile Hopper: a ball that jumps the tiles ---------- */
+  let hopper = null;
+
+  function buildHopper() {
+    const g = new THREE.Group();
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(0.27, 20, 14),
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff, emissive: 0x7c5cff, emissiveIntensity: 1.8, roughness: 0.18, metalness: 0.1,
+      })
+    );
+    g.add(ball);
+    const halo = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.85, 0.85),
+      new THREE.MeshBasicMaterial({
+        color: 0x7c5cff, transparent: true, opacity: 0.2,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      })
+    );
+    halo.rotation.x = -Math.PI / 2;
+    halo.position.y = -0.22;
+    g.add(halo);
+    g.visible = false;
+    scene.add(g);
+    hopper = { group: g, ball, halo, lane: 1, fromX: 0, toX: 0, t: 1, hopDur: 0.2, squash: 0, fell: 0 };
+  }
+
+  function hopTo(lane, power = 1) {
+    if (!hopper) return;
+    hopper.fromX = hopper.group.position.x;
+    hopper.toX = laneX(lane);
+    hopper.lane = lane;
+    hopper.t = 0;
+    hopper.hopDur = 0.19;
+    hopper.power = power;
+  }
+
+  function updateHopper(dt, recZ) {
+    if (!hopper || !hopper.group.visible) return;
+    hopper.t = Math.min(1, hopper.t + dt / hopper.hopDur);
+    const k = hopper.t;
+    const x = hopper.fromX + (hopper.toX - hopper.fromX) * (k * k * (3 - 2 * k));
+    const arc = Math.sin(k * Math.PI) * 0.75 * (hopper.power || 1);
+    const land = k >= 1 ? 1 : 0;
+
+    // squash on landing, stretch at the top of the arc
+    hopper.squash = Math.max(0, hopper.squash - dt * 6);
+    if (land && hopper.squash === 0 && hopper._airborne) {
+      hopper.squash = 1;
+      hopper._airborne = false;
+      pools.burst(x, 0.1, recZ, paletteHex[hopper.lane % paletteHex.length], 6, 0.5);
+    }
+    if (k < 1) hopper._airborne = true;
+
+    hopper.fell = Math.max(0, hopper.fell - dt * 2.2);
+    const sq = hopper.squash;
+    hopper.group.position.set(x, 0.26 + arc - hopper.fell * 0.5, recZ);
+    hopper.ball.scale.set(1 + sq * 0.4 + arc * 0.1, 1 - sq * 0.35 + arc * 0.18, 1 + sq * 0.4);
+    hopper.halo.scale.setScalar(1 + arc * 0.5);
+    hopper.halo.material.opacity = 0.24 - arc * 0.14;
+    hopper.ball.material.emissiveIntensity = 1.8 + (lastFlowState ? 1.4 : 0) + sq * 1.6;
+  }
+
+  // Each pooled note is a small rig: the beveled body, an additive rim
+  // glow that lifts it off the dark track, a motion trail that sells the
+  // approach speed, and a ring that only appears on special notes.
+  const NOTE_GEO = new THREE.BoxGeometry(1, 0.26, 0.34);
+  const GLOW_GEO = new THREE.PlaneGeometry(1.5, 1.0);
+  const TRAIL_GEO = new THREE.PlaneGeometry(1, 1);
+  const RING_GEO = new THREE.RingGeometry(0.44, 0.52, 24);
+
   function buildNotePool() {
-    const geo = new THREE.BoxGeometry(1, 0.26, 0.34);
     for (let i = 0; i < NOTE_POOL; i++) {
-      const m = new THREE.Mesh(geo, laneMats[0]);
-      m.visible = false;
-      scene.add(m);
-      notePool.push(m);
+      const group = new THREE.Group();
+
+      const body = new THREE.Mesh(NOTE_GEO, laneMats[0]);
+      group.add(body);
+
+      const glow = new THREE.Mesh(GLOW_GEO, new THREE.MeshBasicMaterial({
+        color: 0x7c5cff, transparent: true, opacity: 0.2,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }));
+      glow.rotation.x = -Math.PI / 2;
+      glow.position.y = -0.12;
+      group.add(glow);
+
+      const trail = new THREE.Mesh(TRAIL_GEO, new THREE.MeshBasicMaterial({
+        color: 0x7c5cff, transparent: true, opacity: 0.22,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }));
+      trail.rotation.x = -Math.PI / 2;
+      trail.position.y = -0.1;
+      group.add(trail);
+
+      const ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+      }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = -0.06;
+      ring.visible = false;
+      group.add(ring);
+
+      group.visible = false;
+      scene.add(group);
+      notePool.push({ group, body, glow, trail, ring });
     }
   }
 
   function nextMesh() {
-    const m = notePool[noteCursor = (noteCursor + 1) % NOTE_POOL];
-    m.visible = true;
-    return m;
+    const rig = notePool[noteCursor = (noteCursor + 1) % NOTE_POOL];
+    rig.group.visible = true;
+    return rig;
   }
 
   function onResize() {
@@ -221,6 +419,18 @@ const Game = (() => {
     const bars = t === "low" ? 0 : t === "medium" ? 16 : 24;
     if (spectrumBars.length !== bars) buildSpectrum(bars);
     if (pools) pools.setBudget(t === "low" ? 0.3 : t === "medium" ? 0.62 : 1);
+
+    // The new background layers are the first thing to go on weak hardware:
+    // the beat-pulsed glow stays (it carries the music), the fill-rate-heavy
+    // extras don't.
+    if (starField) {
+      starField.visible = t !== "low";
+      starField.material.size = t === "high" ? 0.09 : 0.07;
+    }
+    parallax.forEach((r) => (r.visible = t === "high"));
+    streaks.forEach((s) => (s.visible = t !== "low"));
+    if (backGlow) backGlow.visible = true;
+    noteDetail = t === "low" ? 0 : t === "medium" ? 1 : 2;
     onResize();
     const el = document.getElementById("tier-readout");
     if (el) el.textContent = "tier " + t;
@@ -260,6 +470,14 @@ const Game = (() => {
     });
     scene.userData.key.color.setHex(paletteHex[0]);
     scene.userData.rim.color.setHex(paletteHex[2]);
+    if (backGlow) backGlow.material.color.setHex(paletteHex[0]);
+    if (starField) starField.material.color.setHex(paletteHex[2]);
+    parallax.forEach((r, i) => r.material.color.setHex(paletteHex[(i + 1) % paletteHex.length]));
+    streaks.forEach((s2) => s2.material.color.setHex(paletteHex[2]));
+    if (hopper) {
+      hopper.ball.material.emissive.setHex(paletteHex[0]);
+      hopper.halo.material.color.setHex(paletteHex[0]);
+    }
   }
 
   /* ================= chart preparation ================= */
@@ -377,9 +595,22 @@ const Game = (() => {
     buildTouchLanes();
     resetHud();
     pools.clear();
-    notePool.forEach((m) => (m.visible = false));
+    notePool.forEach((r) => { r.group.visible = false; r.group.rotation.z = 0; });
     const rz = flags.scrollDir === -1 ? RECEPTOR_FAR : RECEPTOR_NEAR;
     receptors.forEach((r) => (r.position.z = rz));
+
+    shake = 0; camKick = 0;
+    const wash = document.getElementById("combo-wash");
+    if (wash) wash.style.opacity = 0;
+    if (hopper) {
+      hopper.group.visible = !!flags.hopper;
+      hopper.lane = Math.floor(laneCount / 2);
+      hopper.fromX = hopper.toX = laneX(hopper.lane);
+      hopper.group.position.set(hopper.toX, 0.26, rz);
+      hopper.t = 1; hopper.fell = 0; hopper.squash = 0;
+      hopper.ball.material.emissive.setHex(paletteHex[0]);
+      hopper.halo.material.color.setHex(paletteHex[0]);
+    }
     // Rewind puts the hit line at the far end, so sit the camera much
     // closer to it — otherwise the whole run happens in the distance.
     updateCameraBase();
@@ -571,6 +802,8 @@ const Game = (() => {
     if (getOpt("shake")) shake = Math.min(0.5, shake + (tier2 === "perfect" ? 0.1 : 0.05));
 
     showJudgement(note.echo ? "echo" : tier2);
+    floatJudgement(note.echo ? "echo" : tier2, pressedLane);
+    if (run.flags.hopper) hopTo(pressedLane, tier2 === "perfect" ? 1.25 : 1);
     updateHud(true);
     hideMesh(note);
   }
@@ -605,13 +838,19 @@ const Game = (() => {
     }
 
     showJudgement("miss");
+    floatJudgement("miss", note.lane);
+    if (run.flags.hopper && hopper) hopper.fell = 1;
     updateHud(false);
     hideMesh(note);
     flashScreen(0xff5470, 0.28);
   }
 
   function hideMesh(note) {
-    if (note.mesh) { note.mesh.visible = false; note.mesh = null; }
+    if (note.mesh) {
+      note.mesh.group.visible = false;
+      note.mesh.group.rotation.z = 0;
+      note.mesh = null;
+    }
   }
 
   /* ================= HUD ================= */
@@ -632,21 +871,26 @@ const Game = (() => {
     if (run.combo > 2) {
       comboEl.classList.remove("hidden");
       document.getElementById("combo-num").textContent = run.combo;
-      const milestone = run.combo % 25 === 0;
+
+      // the combo is the hype number: it physically grows as the streak does
+      comboEl.style.setProperty("--combo-scale", (1 + Math.min(0.85, run.combo / 160)).toFixed(3));
+
+      const milestone = MILESTONES.includes(run.combo);
       comboEl.classList.remove("pulse", "milestone");
       void comboEl.offsetWidth;
       comboEl.classList.add(milestone ? "milestone" : "pulse");
-      if (milestone) {
-        banner(run.combo + " CHAIN", "");
-        pools.burst(0, 0.5, receptorZ(), paletteHex[2], 30, 1.6);
-        flashScreen(paletteHex[2], 0.3);
-      }
-    } else comboEl.classList.add("hidden");
+      if (milestone) celebrateMilestone(run.combo);
+    } else {
+      comboEl.classList.add("hidden");
+      comboEl.style.setProperty("--combo-scale", "1");
+    }
+    updateComboWash();
 
     const meter = document.getElementById("flow-meter");
     document.getElementById("flow-fill").style.width = Math.round(run.flow * 100) + "%";
     const inFlow = run.flow > 0.85;
     meter.classList.toggle("maxed", inFlow);
+    meter.classList.toggle("near", !inFlow && run.flow > 0.65);
     if (inFlow !== lastFlowState) {
       lastFlowState = inFlow;
       applyFlowState(inFlow);
@@ -654,7 +898,40 @@ const Game = (() => {
 
     const echoEl = document.getElementById("echo-debt");
     echoEl.classList.toggle("hidden", run.echoQueue === 0);
-    document.getElementById("echo-count").textContent = run.echoQueue;
+    const echoNum = document.getElementById("echo-count");
+    if (echoNum.textContent !== String(run.echoQueue)) {
+      echoNum.textContent = run.echoQueue;
+      echoEl.classList.remove("bump"); void echoEl.offsetWidth; echoEl.classList.add("bump");
+    }
+  }
+
+  const MILESTONES = [10, 25, 50, 100, 150, 200, 300, 500];
+
+  // Escalating payoff: each threshold hits harder than the last.
+  function celebrateMilestone(combo) {
+    const step = MILESTONES.indexOf(combo);
+    const power = 1 + step * 0.45;
+    banner(combo + " CHAIN", step >= 3 ? "unbroken" : "");
+    pools.burst(0, 0.6, receptorZ(), paletteHex[2], Math.round(22 + step * 12), 1.3 + step * 0.35);
+    for (let i = 0; i < laneCount; i++) {
+      pools.shockwave(laneX(i), receptorZ(), paletteHex[i % paletteHex.length], 1 + step * 0.3);
+    }
+    flashScreen(paletteHex[2], 0.45);
+    if (getOpt("shake")) shake = Math.min(1.1, shake + 0.28 * power);   // camera punch
+    camKick = Math.min(1, 0.35 + step * 0.16);
+    const wash = document.getElementById("combo-wash");
+    wash.classList.remove("surge"); void wash.offsetWidth; wash.classList.add("surge");
+  }
+
+  // Screen-edge colour wash that builds with the streak.
+  function updateComboWash() {
+    const wash = document.getElementById("combo-wash");
+    if (!wash) return;
+    const c = paletteHex[2].toString(16).padStart(6, "0");
+    wash.style.setProperty("--wash", "#" + c);
+    wash.style.opacity = run.combo > 8
+      ? Math.min(0.42, (run.combo - 8) / 260 + (lastFlowState ? 0.12 : 0)).toFixed(3)
+      : 0;
   }
 
   function applyFlowState(on) {
@@ -676,6 +953,32 @@ const Game = (() => {
     el.className = "judgement-pop j-" + t;
     void el.offsetWidth;
     el.classList.add("show");
+  }
+
+  // A second, smaller judgement that pops at the tile's own screen
+  // position, so your eye never has to leave the lane you just hit.
+  const floatPool = [];
+  let floatCursor = 0;
+  const _projV = new THREE.Vector3();
+  function floatJudgement(tier2, lane) {
+    const host = document.getElementById("judge-float");
+    if (!host) return;
+    if (!floatPool.length) {
+      for (let i = 0; i < 8; i++) {
+        const b = document.createElement("b");
+        host.appendChild(b);
+        floatPool.push(b);
+      }
+    }
+    _projV.set(laneX(lane), 0.75, receptorZ()).project(camera);
+    if (_projV.z > 1) return;
+    const el = floatPool[floatCursor = (floatCursor + 1) % floatPool.length];
+    el.textContent = tier2 === "echo" ? "ECHO" : tier2.toUpperCase();
+    el.className = "j-" + tier2;
+    el.style.left = ((_projV.x * 0.5 + 0.5) * 100) + "%";
+    el.style.top = ((-_projV.y * 0.5 + 0.5) * 100) + "%";
+    void el.offsetWidth;
+    el.classList.add("fire");
   }
 
   function banner(text, sub) {
@@ -762,22 +1065,50 @@ const Game = (() => {
 
       if (!n.mesh) {
         n.mesh = nextMesh();
-        n.mesh.material = n.echo ? echoMat : n.hidden ? hiddenMat : (n.type === "hold" ? holdMats[n.lane % laneCount] : laneMats[n.lane % laneCount]);
+        const special = n.echo || n.type === "burst" || n.type === "hold";
+        n.mesh.body.material = n.echo ? echoMat : n.hidden ? hiddenMat
+          : (n.type === "hold" ? holdMats[n.lane % laneCount] : laneMats[n.lane % laneCount]);
         const lw = 4 / laneCount;
-        n.mesh.scale.set(lw * 0.8, 1, n.type === "hold" ? Math.max(1, n.dur * UNITS_PER_BEAT / 0.34) : 1);
+        n.mesh.body.scale.set(lw * 0.8, 1, n.type === "hold" ? Math.max(1, n.dur * UNITS_PER_BEAT / 0.34) : 1);
+
+        const tint = n.echo ? 0xc08bff : paletteHex[n.lane % paletteHex.length];
+        n.mesh.glow.material.color.setHex(tint);
+        n.mesh.trail.material.color.setHex(tint);
+        n.mesh.ring.material.color.setHex(n.echo ? 0xc08bff : paletteHex[2]);
+        n.mesh.glow.scale.set(lw * 0.9, 1, 1);
+        n.mesh.glow.visible = noteDetail >= 1 && !n.hidden && getOpt("particles");
+        n.mesh.trail.visible = noteDetail >= 2 && !n.hidden && getOpt("trails");
+        // the portal ring is a moment, not decoration — specials only
+        n.mesh.ring.visible = noteDetail >= 1 && special && !n.hidden;
       }
-      n.mesh.position.set(laneX(drawLane), 0.17, z);
-      n.mesh.visible = true;
+      n.mesh.group.position.set(laneX(drawLane), 0.17, z);
+      n.mesh.group.visible = true;
+
+      // motion trail stretches behind along travel direction
+      if (n.mesh.trail.visible) {
+        const len = 1.5 + Math.min(2.4, UNITS_PER_BEAT * 0.55);
+        n.mesh.trail.scale.set((4 / laneCount) * 0.55, len, 1);
+        n.mesh.trail.position.z = dir * len * 0.5;
+        n.mesh.trail.material.opacity = 0.2 * Math.min(1, beatsAway / 1.4);
+      }
+
+      // approach ring tightens as a special note nears the line
+      if (n.mesh.ring.visible) {
+        const k = Math.max(0, Math.min(1, beatsAway / LEAD_BEATS));
+        n.mesh.ring.scale.setScalar(0.7 + k * 2.6);
+        n.mesh.ring.material.opacity = 0.75 * (1 - k) * (1 - k);
+        n.mesh.ring.rotation.z += dt * 1.6;
+      }
 
       // Blackout fade: hidden notes vanish before they're readable
       if (n.hidden) {
         const fade = Math.max(0, Math.min(1, (beatsAway - 0.8) / 1.2));
-        n.mesh.material = hiddenMat;
+        n.mesh.body.material = hiddenMat;
         hiddenMat.opacity = 0.16 * fade;
       }
 
       // echoes wobble so they read as different objects at a glance
-      if (n.echo) n.mesh.rotation.z = Math.sin(performance.now() / 140 + n.id) * 0.25;
+      if (n.echo) n.mesh.group.rotation.z = Math.sin(performance.now() / 140 + n.id) * 0.25;
 
       const lateSec = (nowBeat - n.beat) * secPerBeat;
       if (lateSec > WINDOWS.good + 0.03) {
@@ -823,17 +1154,21 @@ const Game = (() => {
         // output; fall back to the beat clock so the bars still perform.
         const fallback = pulse * (0.75 - 0.5 * (i / spectrumBars.length)) + 0.04;
         v = Math.max(v, fallback * (0.35 + 0.65 * run.flow));
-        const target = 0.12 + v * 5.4;
+        const target = 0.1 + v * 2.3;
         bar.scale.y += (target - bar.scale.y) * Math.min(1, dt * 16);
         bar.position.y = bar.scale.y / 2;
-        bar.material.emissiveIntensity = 0.35 + v * 1.5;
+        bar.material.emissiveIntensity = 0.3 + v * 1.1;
       });
     }
 
+    updateBackdrop(dt, pulse, AudioEngine.getLevel());
+    updateHopper(dt, recZ);
+
     // camera: shake + subtle drift + flow push-in
     shake *= Math.pow(0.0016, dt);
+    camKick *= Math.pow(0.02, dt);
     const shakeAmt = getOpt("shake") ? shake : 0;
-    const targetZ = camBaseZ - (lastFlowState ? 0.55 : 0);
+    const targetZ = camBaseZ - (lastFlowState ? 0.55 : 0) - camKick * 1.5;
     camera.position.x = (Math.random() - 0.5) * shakeAmt * 0.55 + Math.sin(performance.now() / 3400) * 0.06;
     camera.position.y = camBaseY + (Math.random() - 0.5) * shakeAmt * 0.4 + pulse * 0.035;
     camera.position.z += (targetZ - camera.position.z) * Math.min(1, dt * 3);

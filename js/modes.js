@@ -13,6 +13,7 @@
      ghostRace      race a recording of your own best run
      chain          play a list of chapters as one continuous run
      loop           repeat a short pattern forever (drills)
+     hopper         you're a ball bouncing lane to lane; hits are hops
    ============================================================ */
 const Modes = {
   story: {
@@ -46,6 +47,13 @@ const Modes = {
     kind: "generative", flags: { generative: true, tempoFollow: true },
     group: 1,
     desc: "No fixed BPM. The song speeds up and slows down to match how fast you're actually tapping — push it and the whole arrangement chases you.",
+  },
+
+  hopper: {
+    id: "hopper", name: "Tile Hopper", sub: "a ball, jumping the tiles",
+    kind: "chapters", flags: { hopper: true, echoDebt: true },
+    group: 1,
+    desc: "Same charts, but you're a ball bouncing lane to lane. Every hit is a hop — land it and you bounce clean, miss and you stumble through the gap.",
   },
 
   ghost: {
@@ -108,4 +116,4 @@ Modes.drillList = [
   { id: "stream", name: "Streams", sub: "sixteenth runs", pattern: "stream", bpm: 140 },
 ];
 
-Modes.order = ["story", "library", "rewind", "blackout", "conductor", "ghost", "marathon", "endless", "daily", "drills"];
+Modes.order = ["story", "library", "rewind", "blackout", "hopper", "conductor", "ghost", "marathon", "endless", "daily", "drills"];

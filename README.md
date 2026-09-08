@@ -53,6 +53,7 @@ harmonizing itself in octaves and fifths.
 | Your Music | Import your own file — auto-charted, album-colored |
 | Rewind | Notes rise away from you; reading direction inverted |
 | Blackout | Phrases vanish and repeat — played from memory |
+| Tile Hopper | You're a ball bouncing lane to lane; every hit is a hop |
 | Conductor | You set the tempo |
 | Ghost Race | Race a recording of your best run |
 | Marathon | All 8 chapters, one combo, one meter, no resets |
@@ -87,13 +88,33 @@ import as the real path. If you run your own backend, add credentials to
 `js/streaming-config.js` and set `ENABLED = true`; the hooks in
 `js/streaming.js` are already in place.
 
+## Feel
+
+Feedback is layered so that fast play still reads at a glance:
+
+- judgement pops twice — a large tier-coloured word in the centre (gold-pink
+  PERFECT, green GREAT, blue GOOD, grey-red MISS) and a small one anchored to
+  the lane you actually hit, so your eye never leaves the tile;
+- every hit throws a particle burst and shockwave at the tile's own position,
+  and the combo number punches on *every* increment while physically growing
+  as the streak does;
+- combo milestones (10 / 25 / 50 / 100 / 150 / 200 / 300 / 500) escalate:
+  wider bursts, a shockwave down every lane, a camera punch, and a
+  screen-edge colour wash that deepens with the streak;
+- notes carry a rim glow and a motion trail, and special notes (holds,
+  bursts, echoes) get an approach ring that tightens as they arrive — a
+  moment rather than permanent decoration;
+- the background is a beat-pulsed ambient glow with drifting dust, light
+  streaks and slow parallax rings, all tinted by the current palette.
+
 ## Performance
 
 Built to stay smooth on old laptops without dropping quality on good ones:
 
 - a live FPS sampler moves between **low / medium / high** tiers automatically,
-  changing pixel ratio, fog distance, spectrum-bar count, particle budget and
-  side geometry — or pick a tier manually in Settings;
+  changing pixel ratio, fog distance, spectrum-bar count, particle budget,
+  side geometry, note detail (rim glow / trails / rings) and which background
+  layers draw at all — or pick a tier manually in Settings;
 - every note mesh, spark and shockwave comes from a **pre-allocated pool**, so
   gameplay never allocates mid-run (the usual cause of stutter);
 - one vendored dependency, no post-processing passes, no shadow maps.
