@@ -1,73 +1,123 @@
-# Flow
+# FLOW
 
-A browser-based 3D rhythm game. No build step, no backend — open `index.html`
-(or host the folder) and play.
+A browser-based 3D rhythm game. No build step, no backend, no install —
+open `index.html` and play. Everything (audio synthesis, chart generation,
+color extraction, saves) runs on-device.
 
-## Play it
+## Play
 
-- **Locally:** open `index.html` in a modern desktop or mobile browser, or serve
-  the folder (`python3 -m http.server`) for the smoothest experience.
-- **Host it anywhere static:** GitHub Pages, Netlify, Vercel, S3 — it's plain
-  HTML/CSS/JS with one vendored dependency (`js/vendor/three.min.js`), so it
-  works fully offline once loaded.
+- **Local:** open `index.html`, or serve the folder (`python3 -m http.server`)
+  for the smoothest result.
+- **Host it:** any static host — GitHub Pages, Netlify, Vercel, S3. Three.js is
+  vendored in `js/vendor/`, so the game works fully offline once loaded.
+- **Controls:** `D F J K` on desktop, tap the on-screen lanes on touch devices,
+  `Esc` to pause. Touchscreen laptops get both at once.
 
-## Features
+## What makes it different
 
-- **Auto device detection** — on first launch Flow guesses PC / Mobile / Touch
-  laptop from touch support, pointer type and screen size, then asks you to
-  confirm (changeable anytime in Settings).
-- **Touch + keyboard, unified** — keyboard lanes (`D F J K`) on desktop,
-  on-screen touch lanes on phones/tablets/touchscreen laptops, both driven by
-  pointer events so they work together on hybrid devices.
-- **3D note highway** (Three.js) with an adaptive-quality system: it samples
-  live FPS and automatically drops pixel ratio / fog distance / particle count
-  on older laptops, then scales back up if the machine can handle more —
-  no manual tuning required, though Settings also offers a manual override.
-- **Story Mode** — six chapters of **original, procedurally-composed music**
-  (synthesized live via the Web Audio API from music-theory rules — scales,
-  chord tones, seeded randomness), each with narrative dialogue before/after.
-  No copyrighted audio is bundled anywhere.
-- **Flow State** — the unique mechanic: sustained high performance (Flow
-  meter > 85%) live-reshapes the scene's lighting, fog, and receptor glow,
-  so skilled play visibly and audibly changes the run in real time.
-- **Your Music mode** — import any local audio file (+ optional album art +
-  optional lyrics). The album art's own colors are extracted client-side and
-  applied directly to the note highway's lane/receptor colors, so every
-  imported song's stage looks like its cover. No embedded art? Flow generates
-  a distinct on-brand cover from the song's title/artist automatically.
-  Songs without a hand-made chart are auto-charted on-device via onset
-  detection (no server, no external service).
-- **Right-side lyrics panel** — drop in a `.lrc` (timestamped) or plain `.txt`
-  lyrics file and it scrolls/highlights in sync on the right edge of the
-  screen during play.
-- **Library search** — filter your imported songs by artist or title.
-- **Streaming (Spotify / Apple Music)** — playing those services' catalogs
-  requires a registered developer app, backend-held OAuth secrets, and (for
-  Spotify) a Premium account; none of that can live safely in a static
-  client. Rather than faking a "search" that surfaces unrelated random songs
-  with matching titles, Flow ships this honestly disabled with the real
-  file-import path as the working alternative — see
-  `js/streaming-config.js` if you want to wire up your own backend.
+Most rhythm games play you a recording and score how close your taps land to a
+chart drawn over it. Flow ties the music and the input together instead.
 
-## Project layout
+**You Are The Instrument.** In every synthesized mode the drums, bass and pads
+are scheduled ahead — but the *lead melody is never scheduled at all*. Each
+chart note carries a real frequency, and it only sounds when you hit it: in
+tune when you're clean, detuned when you're late, a dead muted string when you
+miss. A perfect run performs the song. A sloppy one audibly falls apart. (An
+imported recording can't be gated like that, so misses duck and lowpass the
+track instead.)
+
+**Echo Debt.** A missed note doesn't just vanish — it comes back 8 bars later
+as a violet echo note. Catch it and the debt clears with a score bonus; ignore
+it and it's a second miss. The song replays your mistakes at you.
+
+**Blackout.** A four-bar phrase plays lit, then repeats with the notes
+invisible. You read it once, then perform it from memory — call and response
+rather than sight-reading.
+
+**Conductor.** No fixed BPM. Your own tap spacing is measured and eased into
+the tempo of the bars being generated ahead of you, so the whole arrangement —
+drums, bass, chords — speeds up and slows down to chase you.
+
+**Ghost Race.** Your best run on a chart is recorded hit-by-hit and replayed
+beside you as a translucent rival, including the exact bar where it broke.
+
+**Flow State.** Chain enough clean hits and the run changes on all three
+axes at once: hit windows widen, score doubles, and the lead voice starts
+harmonizing itself in octaves and fifths.
+
+## Modes
+
+| Mode | What it is |
+|---|---|
+| Story Mode | 8 chapters of original score; each teaches a new mechanic |
+| Your Music | Import your own file — auto-charted, album-colored |
+| Rewind | Notes rise away from you; reading direction inverted |
+| Blackout | Phrases vanish and repeat — played from memory |
+| Conductor | You set the tempo |
+| Ghost Race | Race a recording of your best run |
+| Marathon | All 8 chapters, one combo, one meter, no resets |
+| Endless | Generative chart that tightens until you drop it |
+| Daily Remix | One chapter + one modifier, seeded by the date |
+| Drills | Short practice loops scored on accuracy alone |
+
+## Your Music
+
+Import any audio file you own. Flow:
+
+- runs **onset detection** over three energy bands to find real transients,
+  estimates BPM from the inter-onset histogram, and builds a playable chart —
+  no server, no fingerprinting service;
+- **extracts a palette from the album art** by canvas pixel sampling and
+  repaints the lanes, notes, receptors, spectrum bars and menu with it, so
+  every song's stage looks like its cover;
+- **generates a cover** from the title/artist hash when no art is supplied, in
+  the game's own palette family, so the library never has blank tiles;
+- syncs a **right-hand lyrics panel** from a `.lrc` (timestamped) or plain
+  `.txt` file, karaoke-style;
+- stores everything in IndexedDB — nothing is uploaded anywhere.
+
+### Spotify / Apple Music
+
+Not wired up, deliberately. Full-track playback from either service needs a
+registered developer app, OAuth secrets held server-side, and a paid account —
+none of which can ship safely inside a downloadable client. The usual
+workaround is searching by song title, which surfaces unrelated artists with
+matching titles. Rather than do that, streaming ships disabled with local file
+import as the real path. If you run your own backend, add credentials to
+`js/streaming-config.js` and set `ENABLED = true`; the hooks in
+`js/streaming.js` are already in place.
+
+## Performance
+
+Built to stay smooth on old laptops without dropping quality on good ones:
+
+- a live FPS sampler moves between **low / medium / high** tiers automatically,
+  changing pixel ratio, fog distance, spectrum-bar count, particle budget and
+  side geometry — or pick a tier manually in Settings;
+- every note mesh, spark and shockwave comes from a **pre-allocated pool**, so
+  gameplay never allocates mid-run (the usual cause of stutter);
+- one vendored dependency, no post-processing passes, no shadow maps.
+
+## Layout
 
 ```
 index.html
 css/style.css
-js/device.js          device/platform + hardware-tier guessing
-js/color.js            album-art palette extraction (canvas pixel sampling)
-js/audio-engine.js     Web Audio synth playback + file playback + auto-charting
-js/story-data.js       procedural song composer + 6 story chapters
-js/library.js          IndexedDB-backed local music library
-js/lyrics.js           .lrc/.txt parsing + sync panel
-js/game.js             Three.js gameplay, input, scoring, Flow State
-js/main.js             screen/state wiring
-js/streaming-config.js / js/streaming.js   optional Spotify/Apple hooks (disabled by default)
-js/vendor/three.min.js vendored Three.js r160 (no CDN dependency)
+js/device.js            platform + hardware-tier detection
+js/persist.js           saves, best scores, ghosts, settings
+js/color.js             album-art palette extraction
+js/audio-engine.js      synthesis, tempo-map timeline, onset auto-charting
+js/composer.js          procedural arranger (drums/bass/pad/lead)
+js/story-data.js        8 chapters + narrative
+js/modes.js             the 10 modes as modifier sets
+js/ghost.js             ghost recording / playback
+js/library.js           IndexedDB music library
+js/lyrics.js            .lrc parsing + synced panel
+js/vfx.js               ambient particle field, pooled 3D effects
+js/game.js              gameplay, mechanics, rendering
+js/main.js              screens and wiring
+js/vendor/three.min.js  Three.js r160
 ```
 
-## Controls
-
-- **PC:** `D F J K` for the four lanes, `Esc` to pause.
-- **Mobile / touch laptop:** tap the on-screen lanes at the bottom of the
-  screen.
+All music in Flow is generated at runtime from music-theory rules. No
+copyrighted audio is bundled.

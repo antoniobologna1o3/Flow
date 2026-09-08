@@ -49,9 +49,13 @@ const Lyrics = (() => {
       }
       if (idx === lastActive) return;
       lastActive = idx;
-      const prevActive = scroll.querySelector(".lyric-line.active");
-      if (prevActive) prevActive.classList.remove("active");
+      scroll.querySelectorAll(".lyric-line.active, .lyric-line.near")
+        .forEach((n) => n.classList.remove("active", "near"));
       if (idx >= 0) {
+        for (const off of [-1, 1]) {
+          const near = scroll.querySelector(`.lyric-line[data-i="${idx + off}"]`);
+          if (near) near.classList.add("near");
+        }
         const el = scroll.querySelector(`.lyric-line[data-i="${idx}"]`);
         if (el) {
           el.classList.add("active");

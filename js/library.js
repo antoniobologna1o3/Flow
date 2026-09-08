@@ -43,6 +43,7 @@ const Library = (() => {
       id, title: title || "Untitled", artist: artist || "Unknown Artist",
       audioBlob: audioFile, artDataUrl, palette,
       lyricsText: lyricsText || null,
+      generatedArt: !artFile,
       addedAt: Date.now(),
     };
     const d = await db();

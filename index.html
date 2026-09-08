@@ -3,80 +3,85 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>Flow — Rhythm Game</title>
-<meta name="theme-color" content="#0a0a16" />
+<title>FLOW — Rhythm Reimagined</title>
+<meta name="theme-color" content="#07060f" />
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 
-<!-- ===================== BOOT / DEVICE DETECT ===================== -->
+<div id="fx-layer">
+  <canvas id="particle-canvas"></canvas>
+  <div class="horizon-glow"></div>
+  <div class="grain"></div>
+</div>
+
+<!-- ============ BOOT / DEVICE DETECT ============ -->
 <section id="screen-boot" class="screen active">
-  <div class="boot-bg"></div>
   <div class="boot-content">
-    <h1 class="logo">FLOW</h1>
-    <p class="tagline">a rhythm you can touch</p>
-    <div id="boot-detecting" class="boot-detecting">
-      <div class="spinner"></div>
-      <p>Detecting your device…</p>
+    <div class="logo-wrap">
+      <h1 class="logo"><span class="logo-a">FL</span><span class="logo-b">OW</span></h1>
+      <div class="logo-pulse-ring"></div>
     </div>
+    <p class="tagline">every miss comes back</p>
+
+    <div id="boot-detecting" class="boot-detecting">
+      <div class="eq-loader"><i></i><i></i><i></i><i></i><i></i></div>
+      <p>Reading your device…</p>
+    </div>
+
     <div id="boot-result" class="boot-result hidden">
-      <p id="boot-guess-text">We think you're on <strong id="boot-guess">a device</strong>.</p>
+      <p class="boot-guess-line">Detected: <strong id="boot-guess">—</strong></p>
       <div class="boot-choices">
         <button class="choice-card" data-platform="pc">
-          <span class="choice-icon">🖥️</span>
-          <span>PC / Laptop</span>
-          <small>Keyboard controls</small>
+          <span class="choice-icon">⌨</span>
+          <span class="choice-name">PC</span>
+          <small>D F J K</small>
         </button>
         <button class="choice-card" data-platform="mobile">
-          <span class="choice-icon">📱</span>
-          <span>Mobile</span>
-          <small>Touch controls</small>
+          <span class="choice-icon">▚</span>
+          <span class="choice-name">Mobile</span>
+          <small>tap lanes</small>
         </button>
         <button class="choice-card" data-platform="touch">
-          <span class="choice-icon">🖱️</span>
-          <span>Touch Laptop</span>
-          <small>Touch + keyboard</small>
+          <span class="choice-icon">✥</span>
+          <span class="choice-name">Touch Laptop</span>
+          <small>both at once</small>
         </button>
       </div>
+      <p class="boot-hint">You can change this any time in Settings.</p>
     </div>
   </div>
 </section>
 
-<!-- ===================== MAIN MENU ===================== -->
+<!-- ============ MAIN MENU ============ -->
 <section id="screen-menu" class="screen">
-  <div class="menu-bg" id="menu-bg"></div>
+  <div class="menu-disc" id="menu-disc"><div class="menu-disc-inner"></div></div>
+
   <header class="menu-header">
-    <h1 class="logo small">FLOW</h1>
-    <button id="btn-settings" class="icon-btn" aria-label="Settings">⚙️</button>
+    <h1 class="logo tiny"><span class="logo-a">FL</span><span class="logo-b">OW</span></h1>
+    <div class="header-actions">
+      <button id="btn-settings" class="icon-btn" aria-label="Settings">⚙</button>
+    </div>
   </header>
-  <nav class="menu-grid">
-    <button class="menu-tile tile-story" data-go="screen-story">
-      <span class="tile-emoji">📖</span>
-      <span class="tile-title">Story Mode</span>
-      <span class="tile-sub">An original 6-chapter journey</span>
-    </button>
-    <button class="menu-tile tile-library" data-go="screen-library">
-      <span class="tile-emoji">🎵</span>
-      <span class="tile-title">Your Music</span>
-      <span class="tile-sub">Play your own songs</span>
-    </button>
-    <button class="menu-tile tile-connect" id="tile-connect">
-      <span class="tile-emoji">🔗</span>
-      <span class="tile-title">Connect Streaming</span>
-      <span class="tile-sub">Spotify / Apple Music</span>
-    </button>
-    <button class="menu-tile tile-freeplay" id="tile-freeplay" disabled>
-      <span class="tile-emoji">⚡</span>
-      <span class="tile-title">Quick Flow</span>
-      <span class="tile-sub">Random track from your library</span>
-    </button>
-  </nav>
+
+  <div class="menu-body">
+    <nav class="mode-list" id="mode-list"></nav>
+  </div>
+
   <footer class="menu-footer">
+    <div id="last-played" class="last-played hidden">
+      <img id="last-played-art" alt="" />
+      <div>
+        <div class="lp-label">CONTINUE</div>
+        <div id="lp-title" class="lp-title"></div>
+      </div>
+      <button id="lp-go" class="lp-go">▸</button>
+    </div>
     <span id="menu-platform-badge" class="badge"></span>
   </footer>
 </section>
 
-<!-- ===================== SETTINGS ===================== -->
+<!-- ============ SETTINGS ============ -->
 <section id="screen-settings" class="screen">
   <div class="panel-header">
     <button class="back-btn" data-go="screen-menu">←</button>
@@ -84,12 +89,20 @@
   </div>
   <div class="settings-list">
     <label class="setting-row">
-      <span>Graphics quality</span>
+      <span>Graphics quality<small>Auto watches your framerate and adapts</small></span>
       <select id="opt-quality">
-        <option value="auto">Auto (recommended)</option>
+        <option value="auto">Auto</option>
         <option value="low">Low — old laptops</option>
         <option value="medium">Medium</option>
         <option value="high">High</option>
+      </select>
+    </label>
+    <label class="setting-row">
+      <span>Control scheme</span>
+      <select id="opt-platform">
+        <option value="pc">PC / Keyboard</option>
+        <option value="mobile">Mobile / Touch</option>
+        <option value="touch">Touch Laptop</option>
       </select>
     </label>
     <label class="setting-row">
@@ -101,32 +114,38 @@
       <input type="checkbox" id="opt-particles" checked />
     </label>
     <label class="setting-row">
-      <span>Control scheme</span>
-      <select id="opt-platform">
-        <option value="pc">PC / Keyboard</option>
-        <option value="mobile">Mobile / Touch</option>
-        <option value="touch">Touch Laptop</option>
-      </select>
+      <span>Note trails</span>
+      <input type="checkbox" id="opt-trails" checked />
     </label>
-    <div class="setting-row">
-      <span id="fps-readout">FPS: --</span>
+    <label class="setting-row">
+      <span>Echo Debt<small>Missed notes return later in the song</small></span>
+      <input type="checkbox" id="opt-echo" checked />
+    </label>
+    <label class="setting-row">
+      <span>Audio offset<small id="offset-val">0 ms</small></span>
+      <input type="range" id="opt-offset" min="-200" max="200" step="5" value="0" />
+    </label>
+    <div class="setting-row diag">
+      <span id="fps-readout">FPS —</span>
+      <span id="tier-readout">tier —</span>
     </div>
   </div>
 </section>
 
-<!-- ===================== STORY MODE (chapter select) ===================== -->
-<section id="screen-story" class="screen">
+<!-- ============ SONG / CHAPTER SELECT ============ -->
+<section id="screen-select" class="screen">
   <div class="panel-header">
     <button class="back-btn" data-go="screen-menu">←</button>
-    <h2>Story Mode</h2>
+    <h2 id="select-title">Story Mode</h2>
   </div>
-  <div id="story-chapters" class="chapter-grid"></div>
+  <p id="select-desc" class="panel-desc"></p>
+  <div id="select-grid" class="chapter-grid"></div>
 </section>
 
-<!-- ===================== NARRATIVE ===================== -->
+<!-- ============ NARRATIVE ============ -->
 <section id="screen-narrative" class="screen">
   <div class="narrative-wrap">
-    <div id="narrative-art" class="narrative-art"></div>
+    <div id="narrative-art" class="narrative-art"><div class="na-ring"></div><div class="na-core"></div></div>
     <div class="narrative-box">
       <div id="narrative-speaker" class="narrative-speaker"></div>
       <p id="narrative-text" class="narrative-text"></p>
@@ -135,19 +154,24 @@
   </div>
 </section>
 
-<!-- ===================== YOUR MUSIC LIBRARY ===================== -->
+<!-- ============ YOUR MUSIC ============ -->
 <section id="screen-library" class="screen">
   <div class="panel-header">
     <button class="back-btn" data-go="screen-menu">←</button>
     <h2>Your Music</h2>
   </div>
   <div class="library-toolbar">
-    <input id="library-search" type="search" placeholder="Search by artist or title…" autocomplete="off" />
-    <button id="btn-add-track" class="primary-btn small">＋ Add Song</button>
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input id="library-search" type="search" placeholder="Search artist or title…" autocomplete="off" />
+    </div>
+    <button id="btn-add-track" class="primary-btn small">＋ Add</button>
   </div>
   <div id="library-empty" class="library-empty">
-    <p>No songs yet. Add an audio file (and optional album art + lyrics) to get started.</p>
+    <div class="empty-art"></div>
+    <p>Drop in a song you own — Flow reads its waveform, builds a chart, and paints the whole stage with the colors of its cover.</p>
   </div>
+  <button id="btn-streaming" class="streaming-link">Why can't I connect Spotify or Apple Music?</button>
   <div id="library-list" class="library-list"></div>
 
   <input type="file" id="file-audio" accept="audio/*" class="hidden-input" />
@@ -155,60 +179,55 @@
   <input type="file" id="file-lyrics" accept=".lrc,.txt" class="hidden-input" />
 </section>
 
-<!-- ===================== ADD TRACK MODAL ===================== -->
+<!-- ============ ADD TRACK MODAL ============ -->
 <div id="modal-add-track" class="modal hidden">
   <div class="modal-card">
     <h3>Add a song</h3>
-    <button class="upload-row" id="pick-audio">🎧 <span id="pick-audio-label">Choose audio file (required)</span></button>
-    <button class="upload-row" id="pick-art">🖼️ <span id="pick-art-label">Choose album art (optional)</span></button>
-    <button class="upload-row" id="pick-lyrics">📝 <span id="pick-lyrics-label">Choose lyrics .lrc/.txt (optional)</span></button>
+    <button class="upload-row" id="pick-audio"><b>🎧</b><span id="pick-audio-label">Audio file — required</span></button>
+    <button class="upload-row" id="pick-art"><b>🖼</b><span id="pick-art-label">Album art — optional</span></button>
+    <button class="upload-row" id="pick-lyrics"><b>📝</b><span id="pick-lyrics-label">Lyrics .lrc / .txt — optional</span></button>
     <div id="art-preview-wrap" class="art-preview-wrap hidden">
       <img id="art-preview" alt="album art preview" />
+      <div id="art-swatches" class="art-swatches"></div>
     </div>
-    <label class="field">
-      <span>Title</span>
-      <input id="add-title" type="text" placeholder="Song title" />
-    </label>
-    <label class="field">
-      <span>Artist</span>
-      <input id="add-artist" type="text" placeholder="Artist name" />
-    </label>
+    <label class="field"><span>Title</span><input id="add-title" type="text" placeholder="Song title" /></label>
+    <label class="field"><span>Artist</span><input id="add-artist" type="text" placeholder="Artist name" /></label>
     <div class="modal-actions">
       <button id="add-cancel" class="ghost-btn">Cancel</button>
-      <button id="add-save" class="primary-btn">Save Song</button>
+      <button id="add-save" class="primary-btn">Save</button>
     </div>
   </div>
 </div>
 
-<!-- ===================== CONNECT STREAMING ===================== -->
+<!-- ============ STREAMING MODAL ============ -->
 <div id="modal-connect" class="modal hidden">
   <div class="modal-card">
-    <h3>Connect Spotify / Apple Music</h3>
+    <h3>Spotify / Apple Music</h3>
     <p class="modal-note">
-      Streaming APIs require a registered developer app, server-side OAuth secrets,
-      and (for Spotify) a Premium account for full-track playback — none of which
-      can be safely embedded in a downloadable client. Rather than faking a search
-      that returns random unrelated songs, Flow keeps this path honest:
+      Full-track playback from either service needs a registered developer app,
+      OAuth secrets held on a server, and a paid account — none of which can be
+      shipped safely inside a downloadable client. The workaround other sites use
+      is searching by song name, which is exactly the "random artist, same title"
+      mess you didn't want.
     </p>
     <ul class="modal-list">
-      <li>✅ Use <strong>Your Music</strong> to import any song you own or have rights to as a local file — full accuracy, works offline.</li>
-      <li>🛠️ If you run your own backend, drop your Spotify/Apple client credentials into <code>js/streaming-config.js</code> and flip <code>ENABLED = true</code> — Flow already calls the hook in <code>js/streaming.js</code>.</li>
+      <li><b>Working path:</b> <strong>Your Music</strong> imports any file you own. Exact song, exact cover, works offline.</li>
+      <li><b>If you host a backend:</b> add your credentials in <code>js/streaming-config.js</code> and set <code>ENABLED = true</code> — the hooks are already wired in <code>js/streaming.js</code>.</li>
     </ul>
-    <div class="modal-actions">
-      <button id="connect-close" class="primary-btn">Got it</button>
-    </div>
+    <div class="modal-actions"><button id="connect-close" class="primary-btn">Got it</button></div>
   </div>
 </div>
 
-<!-- ===================== GAME ===================== -->
+<!-- ============ GAME ============ -->
 <section id="screen-game" class="screen">
   <canvas id="game-canvas"></canvas>
+  <div id="game-flash" class="game-flash"></div>
   <div id="game-vignette"></div>
 
   <div class="hud-top">
     <div class="hud-left">
       <div id="hud-score">0</div>
-      <div id="hud-combo" class="hud-combo hidden">0x</div>
+      <div id="hud-mode-chip" class="mode-chip"></div>
     </div>
     <div id="album-corner" class="album-corner hidden">
       <img id="album-corner-img" alt="" />
@@ -217,63 +236,89 @@
         <div id="album-corner-artist"></div>
       </div>
     </div>
-    <button id="btn-pause" class="icon-btn">⏸</button>
+    <button id="btn-pause" class="icon-btn">❚❚</button>
   </div>
 
-  <div id="flow-meter" class="flow-meter"><div id="flow-fill" class="flow-fill"></div><span>FLOW</span></div>
+  <div class="hud-combo-wrap">
+    <div id="hud-combo" class="hud-combo hidden"><b id="combo-num">0</b><small>COMBO</small></div>
+  </div>
+
+  <div class="flow-rail">
+    <div id="flow-meter" class="flow-meter"><div id="flow-fill" class="flow-fill"></div></div>
+    <div class="flow-label">FLOW</div>
+    <div id="echo-debt" class="echo-debt hidden">ECHO ×<b id="echo-count">0</b></div>
+  </div>
+
+  <div id="ghost-hud" class="ghost-hud hidden">
+    <span>GHOST</span><b id="ghost-score">0</b>
+    <div id="ghost-delta" class="ghost-delta"></div>
+  </div>
 
   <div id="lyrics-panel" class="lyrics-panel hidden">
+    <div class="lyrics-fade-top"></div>
     <div id="lyrics-scroll" class="lyrics-scroll"></div>
+    <div class="lyrics-fade-bottom"></div>
   </div>
 
   <div id="touch-lanes" class="touch-lanes hidden"></div>
 
   <div id="judgement-pop" class="judgement-pop"></div>
+  <div id="event-banner" class="event-banner"></div>
 
   <div id="pause-overlay" class="modal hidden">
     <div class="modal-card">
       <h3>Paused</h3>
       <div class="modal-actions vertical">
         <button id="btn-resume" class="primary-btn">Resume</button>
-        <button id="btn-restart" class="ghost-btn">Restart Song</button>
-        <button id="btn-quit" class="ghost-btn">Quit to Menu</button>
+        <button id="btn-restart" class="ghost-btn">Restart</button>
+        <button id="btn-quit" class="ghost-btn">Quit</button>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ===================== RESULTS ===================== -->
+<!-- ============ RESULTS ============ -->
 <section id="screen-results" class="screen">
   <div class="results-wrap">
-    <h2 id="results-title">Song Complete</h2>
-    <div class="results-grade" id="results-grade">S</div>
+    <div id="results-sub" class="results-sub"></div>
+    <h2 id="results-title">Complete</h2>
+    <div class="results-grade-wrap">
+      <div class="grade-burst"></div>
+      <div class="results-grade" id="results-grade">S</div>
+    </div>
     <div class="results-stats">
-      <div><span id="stat-score">0</span><small>Score</small></div>
-      <div><span id="stat-combo">0</span><small>Max Combo</small></div>
-      <div><span id="stat-accuracy">0%</span><small>Accuracy</small></div>
+      <div><span id="stat-score">0</span><small>SCORE</small></div>
+      <div><span id="stat-combo">0</span><small>MAX COMBO</small></div>
+      <div><span id="stat-accuracy">0%</span><small>ACCURACY</small></div>
     </div>
     <div class="results-breakdown">
-      <div class="judge-row perfect"><span>Perfect</span><span id="j-perfect">0</span></div>
-      <div class="judge-row great"><span>Great</span><span id="j-great">0</span></div>
-      <div class="judge-row good"><span>Good</span><span id="j-good">0</span></div>
-      <div class="judge-row miss"><span>Miss</span><span id="j-miss">0</span></div>
+      <div class="judge-row perfect"><span>Perfect</span><i id="bar-perfect"></i><span id="j-perfect">0</span></div>
+      <div class="judge-row great"><span>Great</span><i id="bar-great"></i><span id="j-great">0</span></div>
+      <div class="judge-row good"><span>Good</span><i id="bar-good"></i><span id="j-good">0</span></div>
+      <div class="judge-row miss"><span>Miss</span><i id="bar-miss"></i><span id="j-miss">0</span></div>
     </div>
-    <div class="modal-actions">
+    <div id="results-extra" class="results-extra"></div>
+    <div class="modal-actions center">
+      <button id="results-retry" class="ghost-btn">Retry</button>
       <button id="results-continue" class="primary-btn">Continue</button>
-      <button id="results-menu" class="ghost-btn">Menu</button>
     </div>
   </div>
 </section>
 
 <script src="js/vendor/three.min.js"></script>
 <script src="js/device.js"></script>
+<script src="js/persist.js"></script>
 <script src="js/color.js"></script>
 <script src="js/audio-engine.js"></script>
+<script src="js/composer.js"></script>
 <script src="js/story-data.js"></script>
+<script src="js/modes.js"></script>
+<script src="js/ghost.js"></script>
 <script src="js/streaming-config.js"></script>
 <script src="js/streaming.js"></script>
 <script src="js/library.js"></script>
 <script src="js/lyrics.js"></script>
+<script src="js/vfx.js"></script>
 <script src="js/game.js"></script>
 <script src="js/main.js"></script>
 </body>
