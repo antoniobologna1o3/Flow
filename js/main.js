@@ -5,7 +5,6 @@
   let currentChapterId = null;
   let currentTrack = null;
   let resultsAction = null;
-  let pickedAudio = null, pickedArt = null, pickedLyrics = null;
   let livePalette = { p1: "#7c5cff", p2: "#ff5ca8", p3: "#5cf0ff" };
 
   const $ = (id) => document.getElementById(id);
@@ -376,9 +375,22 @@
     document.getElementById("event-banner").innerHTML = "LISTENING…<small>building your chart</small>";
     document.getElementById("event-banner").classList.add("show");
 
-    AudioEngine.ensureCtx();
-    const buffer = await AudioEngine.loadFile(t.audioBlob);
-    const chart = await AudioEngine.autoChart(buffer, 4);
+    let buffer, chart;
+    try {
+      AudioEngine.ensureCtx();
+      buffer = await AudioEngine.loadFile(t.audioBlob);
+      chart = await AudioEngine.autoChart(buffer, 4);
+    } catch (err) {
+      // Unsupported codec, DRM, or a corrupt file — say so and go back
+      // rather than sitting on an empty stage forever.
+      document.getElementById("event-banner").classList.remove("show");
+      go("screen-library");
+      refreshLibrary();
+      toastError("<b>Couldn't play \"" + escapeHtml(t.title) + "\".</b><br>" +
+        "Your browser couldn't decode this file. MP3, M4A, WAV and OGG work best; " +
+        "DRM-protected files (like purchased iTunes tracks) can't be decoded by any browser.");
+      return;
+    }
 
     Game.startRun({
       mode: "library", modeLabel: "Your Music",
@@ -393,67 +405,127 @@
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  /* ---------------- batch import: drop a folder or many files ---------------- */
+
+  // Recursively walk a dropped directory entry (Chrome/Edge/Safari).
+  function readEntry(entry, out, depth = 0) {
+    return new Promise((resolve) => {
+      if (!entry || depth > 8) return resolve();
+      if (entry.isFile) {
+        entry.file(
+          (f) => { out.push(f); resolve(); },
+          () => resolve()
+        );
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        const all = [];
+        const readBatch = () => reader.readEntries(async (entries) => {
+          if (!entries.length) {
+            for (const e of all) await readEntry(e, out, depth + 1);
+            return resolve();
+          }
+          all.push(...entries);
+          readBatch();                       // readEntries returns 100 at a time
+        }, () => resolve());
+        readBatch();
+      } else resolve();
+    });
+  }
+
+  async function filesFromDataTransfer(dt) {
+    const out = [];
+    const items = dt.items ? [...dt.items] : [];
+    const entries = items
+      .map((it) => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null))
+      .filter(Boolean);
+    if (entries.length) {
+      for (const e of entries) await readEntry(e, out);
+      if (out.length) return out;
+    }
+    return dt.files ? [...dt.files] : [];
+  }
+
+  async function importFiles(files) {
+    const list = [...files];
+    if (!list.length) return;
+    const toast = $("import-toast");
+    const fill = $("it-fill");
+    const text = $("it-text");
+    toast.classList.remove("hidden");
+    fill.style.width = "0%";
+    text.textContent = "Reading files…";
+
+    let result;
+    try {
+      result = await Library.addMany(list, (done, total, name) => {
+        fill.style.width = total ? Math.round((done / total) * 100) + "%" : "0%";
+        text.textContent = name
+          ? `Importing ${done + 1} of ${total} — ${name}`
+          : `Imported ${total} song${total === 1 ? "" : "s"}`;
+      });
+    } catch (err) {
+      toast.classList.add("hidden");
+      toastError("<b>Import failed.</b><br>" + escapeHtml(String(err && err.message ? err.message : err)));
+      return;
+    }
+
+    await refreshLibrary($("library-search").value);
+    renderMenu();
+
+    if (!result.total) {
+      toast.classList.add("hidden");
+      toastError("<b>No audio files found.</b><br>Drop MP3, M4A, FLAC, OGG or WAV files (or a folder containing them).");
+      return;
+    }
+    text.textContent = `Added ${result.added} song${result.added === 1 ? "" : "s"}` +
+      (result.failed.length ? ` · ${result.failed.length} skipped` : "");
+    fill.style.width = "100%";
+    setTimeout(() => toast.classList.add("hidden"), 2600);
+    if (result.failed.length) {
+      toastError("<b>Skipped " + result.failed.length + " file" + (result.failed.length === 1 ? "" : "s") + ":</b><br>" +
+        result.failed.slice(0, 4).map((f) => escapeHtml(f.name)).join("<br>"));
+    }
+  }
+
+  function wireDropZone() {
+    const overlay = $("drop-overlay");
+    let depth = 0;
+    const show = () => overlay.classList.remove("hidden");
+    const hide = () => { depth = 0; overlay.classList.add("hidden"); };
+
+    addEventListener("dragenter", (e) => { e.preventDefault(); depth++; show(); });
+    addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+    addEventListener("dragleave", (e) => { e.preventDefault(); if (--depth <= 0) hide(); });
+    addEventListener("drop", async (e) => {
+      e.preventDefault();
+      hide();
+      const files = await filesFromDataTransfer(e.dataTransfer);
+      if (!files.length) return;
+      go("screen-library");
+      await importFiles(files);
+    });
+  }
+
   function wireLibrary() {
+    wireDropZone();
+
+    $("btn-add-folder").addEventListener("click", () => $("file-folder").click());
+    $("file-folder").addEventListener("change", async (e) => {
+      const files = [...e.target.files];
+      e.target.value = "";
+      await importFiles(files);
+    });
+    $("file-batch").addEventListener("change", async (e) => {
+      const files = [...e.target.files];
+      e.target.value = "";
+      await importFiles(files);
+    });
+
+    $("error-close").addEventListener("click", () => $("error-toast").classList.add("hidden"));
+
     $("library-search").addEventListener("input", (e) => refreshLibrary(e.target.value));
 
-    $("btn-add-track").addEventListener("click", () => {
-      pickedAudio = pickedArt = pickedLyrics = null;
-      $("pick-audio-label").textContent = "Audio file — required";
-      $("pick-art-label").textContent = "Album art — optional";
-      $("pick-lyrics-label").textContent = "Lyrics .lrc / .txt — optional";
-      $("art-preview-wrap").classList.add("hidden");
-      $("add-title").value = ""; $("add-artist").value = "";
-      $("modal-add-track").classList.remove("hidden");
-    });
-    $("add-cancel").addEventListener("click", () => $("modal-add-track").classList.add("hidden"));
-
-    $("pick-audio").addEventListener("click", () => $("file-audio").click());
-    $("pick-art").addEventListener("click", () => $("file-art").click());
-    $("pick-lyrics").addEventListener("click", () => $("file-lyrics").click());
-
-    $("file-audio").addEventListener("change", (e) => {
-      pickedAudio = e.target.files[0] || null;
-      if (!pickedAudio) return;
-      $("pick-audio-label").textContent = pickedAudio.name;
-      if (!$("add-title").value) $("add-title").value = pickedAudio.name.replace(/\.[^.]+$/, "");
-    });
-
-    $("file-art").addEventListener("change", async (e) => {
-      pickedArt = e.target.files[0] || null;
-      if (!pickedArt) return;
-      $("pick-art-label").textContent = pickedArt.name;
-      const url = URL.createObjectURL(pickedArt);
-      $("art-preview").src = url;
-      $("art-preview-wrap").classList.remove("hidden");
-      // show the palette we'd pull off the cover, before saving
-      const img = new Image();
-      img.onload = async () => {
-        const pal = await ColorExtract.fromImage(img);
-        $("art-swatches").innerHTML = [pal.primary, pal.secondary, pal.accent]
-          .map((c, i) => `<i style="background:${c};animation-delay:${i * .06}s"></i>`).join("");
-      };
-      img.src = url;
-    });
-
-    $("file-lyrics").addEventListener("change", (e) => {
-      pickedLyrics = e.target.files[0] || null;
-      if (pickedLyrics) $("pick-lyrics-label").textContent = pickedLyrics.name;
-    });
-
-    $("add-save").addEventListener("click", async () => {
-      if (!pickedAudio) { $("pick-audio").style.borderColor = "var(--miss)"; return; }
-      const btn = $("add-save");
-      btn.disabled = true; btn.textContent = "Saving…";
-      const lyricsText = pickedLyrics ? await pickedLyrics.text() : null;
-      await Library.addTrack({
-        title: $("add-title").value || pickedAudio.name,
-        artist: $("add-artist").value || "Unknown Artist",
-        audioFile: pickedAudio, artFile: pickedArt, lyricsText,
-      });
-      btn.disabled = false; btn.textContent = "Save";
-      $("modal-add-track").classList.add("hidden");
-      refreshLibrary($("library-search").value);
-    });
+    $("btn-add-track").addEventListener("click", () => $("file-batch").click());
   }
 
   /* ---------------- results ---------------- */
@@ -588,15 +660,72 @@
   }
 
   /* ---------------- go ---------------- */
+  // Nothing here may take the whole app down with it: on an old laptop
+  // WebGL can be missing entirely, and in private browsing IndexedDB can
+  // be blocked. Either used to leave the boot screen stuck forever.
   addEventListener("DOMContentLoaded", async () => {
-    Game.init();
-    VFX.Ambient.start($("particle-canvas"), () => livePalette);
-    boot();
-    wireChrome();
-    wireLibrary();
-    wireResults();
-    const all = await Library.getAll();
-    libraryCount = all.length;
-    renderMenu();
+    try {
+      Game.init();
+    } catch (err) {
+      showFatal(err);
+      return;
+    }
+    try { VFX.Ambient.start($("particle-canvas"), () => livePalette); } catch (e) { console.warn(e); }
+    try { boot(); } catch (e) { showFatal(e); return; }
+    try { wireChrome(); } catch (e) { console.warn(e); }
+    try { wireLibrary(); } catch (e) { console.warn(e); }
+    try { wireResults(); } catch (e) { console.warn(e); }
+    try {
+      const all = await Library.getAll();
+      libraryCount = all.length;
+    } catch (e) {
+      libraryCount = 0;
+      console.warn("Library unavailable:", e);
+    }
+    try { renderMenu(); } catch (e) { console.warn(e); }
   });
+
+  function showFatal(err) {
+    const detecting = $("boot-detecting");
+    if (detecting) detecting.classList.add("hidden");
+    const box = document.createElement("div");
+    box.className = "boot-fatal";
+    const webglMissing = !hasWebGL();
+    box.innerHTML = webglMissing
+      ? "<b>This browser can't start 3D graphics.</b><br>Flow needs WebGL. Try enabling hardware acceleration " +
+        "(Chrome: Settings → System → \"Use graphics acceleration when available\"), then reload. " +
+        "If you're in a private window or have WebGL disabled by policy, try a normal window."
+      : "<b>Something went wrong starting the game.</b><br>" + escapeHtml(String(err && err.message ? err.message : err));
+    const content = document.querySelector(".boot-content");
+    if (content) content.appendChild(box);
+    console.error(err);
+  }
+
+  function hasWebGL() {
+    try {
+      const c = document.createElement("canvas");
+      return !!(c.getContext("webgl") || c.getContext("experimental-webgl"));
+    } catch (e) { return false; }
+  }
+
+  // Any unexpected failure becomes visible instead of a frozen screen.
+  function toastError(msg) {
+    const t = $("error-toast");
+    if (!t) return;
+    $("error-text").innerHTML = msg;
+    t.classList.remove("hidden");
+    clearTimeout(toastError._t);
+    toastError._t = setTimeout(() => t.classList.add("hidden"), 9000);
+  }
+  addEventListener("error", (e) => {
+    if (e && e.message) toastError("<b>Error:</b> " + escapeHtml(e.message));
+  });
+  addEventListener("unhandledrejection", (e) => {
+    const r = e && e.reason;
+    toastError("<b>Error:</b> " + escapeHtml(String(r && r.message ? r.message : r)));
+  });
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
 })();

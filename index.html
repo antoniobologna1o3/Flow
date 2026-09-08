@@ -165,38 +165,36 @@
       <span class="search-icon">⌕</span>
       <input id="library-search" type="search" placeholder="Search artist or title…" autocomplete="off" />
     </div>
+    <button id="btn-add-folder" class="ghost-btn small">Folder</button>
     <button id="btn-add-track" class="primary-btn small">＋ Add</button>
   </div>
   <div id="library-empty" class="library-empty">
     <div class="empty-art"></div>
-    <p>Drop in a song you own — Flow reads its waveform, builds a chart, and paints the whole stage with the colors of its cover.</p>
+    <p>Drag in songs — or a whole folder — and Flow reads each file's own title, artist and cover art, builds a chart from its waveform, and paints the stage with the cover's colours.<br><br>MP3 · M4A · FLAC · OGG · WAV</p>
   </div>
   <button id="btn-streaming" class="streaming-link">Why can't I connect Spotify or Apple Music?</button>
   <div id="library-list" class="library-list"></div>
 
-  <input type="file" id="file-audio" accept="audio/*" class="hidden-input" />
-  <input type="file" id="file-art" accept="image/*" class="hidden-input" />
-  <input type="file" id="file-lyrics" accept=".lrc,.txt" class="hidden-input" />
+  <input type="file" id="file-batch" accept="audio/*,image/*,.lrc,.txt,.mp3,.m4a,.flac,.ogg,.opus,.wav" multiple class="hidden-input" />
+  <input type="file" id="file-folder" webkitdirectory directory multiple class="hidden-input" />
 </section>
 
-<!-- ============ ADD TRACK MODAL ============ -->
-<div id="modal-add-track" class="modal hidden">
-  <div class="modal-card">
-    <h3>Add a song</h3>
-    <button class="upload-row" id="pick-audio"><b>🎧</b><span id="pick-audio-label">Audio file — required</span></button>
-    <button class="upload-row" id="pick-art"><b>🖼</b><span id="pick-art-label">Album art — optional</span></button>
-    <button class="upload-row" id="pick-lyrics"><b>📝</b><span id="pick-lyrics-label">Lyrics .lrc / .txt — optional</span></button>
-    <div id="art-preview-wrap" class="art-preview-wrap hidden">
-      <img id="art-preview" alt="album art preview" />
-      <div id="art-swatches" class="art-swatches"></div>
-    </div>
-    <label class="field"><span>Title</span><input id="add-title" type="text" placeholder="Song title" /></label>
-    <label class="field"><span>Artist</span><input id="add-artist" type="text" placeholder="Artist name" /></label>
-    <div class="modal-actions">
-      <button id="add-cancel" class="ghost-btn">Cancel</button>
-      <button id="add-save" class="primary-btn">Save</button>
-    </div>
+<div id="drop-overlay" class="drop-overlay hidden">
+  <div class="drop-inner">
+    <div class="drop-icon">♪</div>
+    <div class="drop-title">Drop songs or a whole folder</div>
+    <div class="drop-sub">Cover art and titles are read from the files themselves</div>
   </div>
+</div>
+
+<div id="import-toast" class="import-toast hidden">
+  <div class="it-bar"><i id="it-fill"></i></div>
+  <div id="it-text" class="it-text">Importing…</div>
+</div>
+
+<div id="error-toast" class="error-toast hidden">
+  <div id="error-text"></div>
+  <button id="error-close">✕</button>
 </div>
 
 <!-- ============ STREAMING MODAL ============ -->
@@ -309,6 +307,7 @@
 
 <script src="js/vendor/three.min.js"></script>
 <script src="js/device.js"></script>
+<script src="js/tags.js"></script>
 <script src="js/persist.js"></script>
 <script src="js/color.js"></script>
 <script src="js/audio-engine.js"></script>

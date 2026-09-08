@@ -1,15 +1,19 @@
 # FLOW
 
-A browser-based 3D rhythm game. No build step, no backend, no install —
-open `index.html` and play. Everything (audio synthesis, chart generation,
-color extraction, saves) runs on-device.
+A browser-based 3D rhythm game that ships as **one self-contained HTML file**.
+No install, no backend, no network. Everything — audio synthesis, chart
+generation, colour extraction, saves — runs on-device.
 
 ## Play
 
-- **Local:** open `index.html`, or serve the folder (`python3 -m http.server`)
-  for the smoothest result.
-- **Host it:** any static host — GitHub Pages, Netlify, Vercel, S3. Three.js is
-  vendored in `js/vendor/`, so the game works fully offline once loaded.
+- **Easiest — one file:** open **`FLOW.html`**. Everything (styles, game code,
+  Three.js) is inlined into that single file, so it needs no folder structure,
+  no server and no network. Download it anywhere — a Chromebook's Downloads
+  folder, a USB stick, an email attachment — and double-click it.
+- **From source:** open `index.html` (it loads `css/` and `js/` from alongside
+  it), or serve the folder with `python3 -m http.server`.
+- **Rebuild the single file** after changing any source:  `node build.js`
+- **Host it:** any static host — GitHub Pages, Netlify, Vercel, S3.
 - **Controls:** `D F J K` on desktop, tap the on-screen lanes on touch devices,
   `Esc` to pause. Touchscreen laptops get both at once.
 
@@ -63,8 +67,14 @@ harmonizing itself in octaves and fifths.
 
 ## Your Music
 
-Import any audio file you own. Flow:
+Drag in songs — one, a selection, or an entire folder — or use the **Folder**
+button. Flow:
 
+- reads each file's **own tags** for title, artist and **embedded cover art**
+  (ID3v2 for MP3, iTunes atoms for M4A/MP4, Vorbis comments and PICTURE blocks
+  for FLAC/OGG/Opus, RIFF INFO for WAV), so a dropped library names itself;
+- matches loose files in the same drop by filename — `Song.lrc` attaches to
+  `Song.mp3`, and a `cover.jpg` / `folder.jpg` applies to the whole folder;
 - runs **onset detection** over three energy bands to find real transients,
   estimates BPM from the inter-onset histogram, and builds a playable chart —
   no server, no fingerprinting service;
@@ -76,6 +86,9 @@ Import any audio file you own. Flow:
 - syncs a **right-hand lyrics panel** from a `.lrc` (timestamped) or plain
   `.txt` file, karaoke-style;
 - stores everything in IndexedDB — nothing is uploaded anywhere.
+
+If a file can't be decoded (a DRM-protected purchase, an exotic codec), Flow
+says so and returns you to the library instead of hanging on a blank stage.
 
 ### Spotify / Apple Music
 
@@ -124,13 +137,16 @@ Built to stay smooth on old laptops without dropping quality on good ones:
 ```
 index.html
 css/style.css
+build.js                bundles everything into the single-file FLOW.html
+FLOW.html               the built single-file game (open this one)
 js/device.js            platform + hardware-tier detection
+js/tags.js              ID3 / MP4 / FLAC / OGG / WAV metadata + cover art
 js/persist.js           saves, best scores, ghosts, settings
 js/color.js             album-art palette extraction
 js/audio-engine.js      synthesis, tempo-map timeline, onset auto-charting
 js/composer.js          procedural arranger (drums/bass/pad/lead)
 js/story-data.js        8 chapters + narrative
-js/modes.js             the 10 modes as modifier sets
+js/modes.js             the 11 modes as modifier sets
 js/ghost.js             ghost recording / playback
 js/library.js           IndexedDB music library
 js/lyrics.js            .lrc parsing + synced panel

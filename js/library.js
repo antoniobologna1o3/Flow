@@ -26,6 +26,16 @@ const Library = (() => {
     const id = "t_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
     let artDataUrl = null;
     let palette = { primary: "#7c5cff", secondary: "#ff5ca8", accent: "#5cf0ff" };
+    let embedded = false;
+
+    // The file usually already knows what it is — read its own tags for
+    // title, artist and cover art before falling back to anything else.
+    let tags = { title: null, artist: null, album: null, picture: null };
+    try { tags = await Tags.read(audioFile); } catch (e) {}
+    if (!title || !title.trim()) title = tags.title || stripExt(audioFile.name);
+    if (!artist || artist === "Unknown Artist") artist = tags.artist || "Unknown Artist";
+
+    if (!artFile && tags.picture) { artFile = tags.picture.blob; embedded = true; }
 
     if (artFile) {
       artDataUrl = await fileToDataUrl(artFile);
@@ -44,6 +54,8 @@ const Library = (() => {
       audioBlob: audioFile, artDataUrl, palette,
       lyricsText: lyricsText || null,
       generatedArt: !artFile,
+      embeddedArt: embedded,
+      album: tags.album || null,
       addedAt: Date.now(),
     };
     const d = await db();
@@ -82,6 +94,48 @@ const Library = (() => {
     return tracks.filter((t) =>
       t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
     );
+  }
+
+  function stripExt(name) { return String(name || "Untitled").replace(/\.[^.]+$/, ""); }
+
+  // Import many files at once (a folder drop, a multi-select). Audio files
+  // become tracks; loose images and .lrc files in the same drop are matched
+  // to them by filename, or used as a shared album cover.
+  async function addMany(files, onProgress) {
+    const list = [...files];
+    const isAudio = (f) => /\.(mp3|m4a|mp4|aac|flac|ogg|oga|opus|wav|wave|weba|webm)$/i.test(f.name) || (f.type || "").startsWith("audio/");
+    const isImage = (f) => /\.(jpe?g|png|gif|webp|bmp)$/i.test(f.name) || (f.type || "").startsWith("image/");
+    const isLyric = (f) => /\.(lrc|txt)$/i.test(f.name);
+
+    const audio = list.filter(isAudio);
+    const images = list.filter(isImage);
+    const lyrics = list.filter(isLyric);
+
+    // a "cover.jpg" / "folder.jpg" style image applies to the whole drop
+    const shared = images.find((f) => /(^|\/)(cover|folder|front|album|artwork)\.[a-z]+$/i.test(f.name)) || null;
+
+    const results = { added: 0, failed: [], total: audio.length };
+    for (let i = 0; i < audio.length; i++) {
+      const f = audio[i];
+      if (onProgress) onProgress(i, audio.length, f.name);
+      try {
+        const base = stripExt(baseName(f.name)).toLowerCase();
+        const art = images.find((im) => stripExt(baseName(im.name)).toLowerCase() === base) || shared;
+        const lyricFile = lyrics.find((l) => stripExt(baseName(l.name)).toLowerCase() === base);
+        const lyricsText = lyricFile ? await lyricFile.text() : null;
+        await addTrack({ title: null, artist: null, audioFile: f, artFile: art || null, lyricsText });
+        results.added++;
+      } catch (e) {
+        results.failed.push({ name: f.name, error: e && e.message ? e.message : String(e) });
+      }
+    }
+    if (onProgress) onProgress(audio.length, audio.length, null);
+    return results;
+  }
+
+  function baseName(path) {
+    const parts = String(path).split(/[\\/]/);
+    return parts[parts.length - 1];
   }
 
   function fileToDataUrl(file) {
@@ -154,5 +208,5 @@ const Library = (() => {
     return canvas.toDataURL("image/png");
   }
 
-  return { addTrack, getAll, remove, search };
+  return { addTrack, addMany, getAll, remove, search };
 })();

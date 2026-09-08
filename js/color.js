@@ -39,11 +39,11 @@ const ColorExtract = (() => {
           palette.push(palette[palette.length - 1] || { r: 124, g: 92, b: 255 });
         }
 
-        resolve({
-          primary: rgbToHex(palette[0]),
-          secondary: rgbToHex(palette[1]),
-          accent: rgbToHex(palette[2]),
-        });
+        resolve(separate([
+          rgbToHex(palette[0]),
+          rgbToHex(palette[1]),
+          rgbToHex(palette[2]),
+        ]));
       } catch (err) {
         // Cross-origin / decode failure -> fall back to default Flow palette
         resolve({ primary: "#7c5cff", secondary: "#ff5ca8", accent: "#5cf0ff" });
@@ -72,6 +72,55 @@ const ColorExtract = (() => {
   function rgbToHex({ r, g, b }) {
     const c = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
     return `#${c(r)}${c(g)}${c(b)}`;
+  }
+
+  // Lanes are told apart by colour, so a flat single-colour cover (very
+  // common on minimalist artwork) must not collapse all three slots into
+  // the same value. Keep the cover's dominant hue as primary, then fan the
+  // other two out far enough to stay readable at speed.
+  function separate(hexes) {
+    const hsl = hexes.map(hexToHsl);
+    const MIN_HUE = 42;                    // degrees
+    for (let i = 1; i < hsl.length; i++) {
+      for (let k = 0; k < i; k++) {
+        let d = Math.abs(hsl[i][0] - hsl[k][0]);
+        if (d > 180) d = 360 - d;
+        if (d < MIN_HUE) {
+          hsl[i][0] = (hsl[k][0] + MIN_HUE * (i === 1 ? 1 : 2) + 360) % 360;
+        }
+      }
+      // and keep them all bright enough to read against a dark track
+      hsl[i][1] = Math.max(0.5, hsl[i][1]);
+      hsl[i][2] = Math.min(0.72, Math.max(0.45, hsl[i][2]));
+    }
+    hsl[0][1] = Math.max(0.42, hsl[0][1]);
+    hsl[0][2] = Math.min(0.72, Math.max(0.45, hsl[0][2]));
+    return {
+      primary: hslToHex(hsl[0]),
+      secondary: hslToHex(hsl[1]),
+      accent: hslToHex(hsl[2]),
+    };
+  }
+
+  function hexToHsl(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const [h, s, l] = rgbToHsl((n >> 16) & 255, (n >> 8) & 255, n & 255);
+    return [h, s, l];
+  }
+
+  function hslToHex([h, s, l]) {
+    h = ((h % 360) + 360) % 360;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) [r, g, b] = [c, x, 0];
+    else if (h < 120) [r, g, b] = [x, c, 0];
+    else if (h < 180) [r, g, b] = [0, c, x];
+    else if (h < 240) [r, g, b] = [0, x, c];
+    else if (h < 300) [r, g, b] = [x, 0, c];
+    else [r, g, b] = [c, 0, x];
+    return rgbToHex({ r: (r + m) * 255, g: (g + m) * 255, b: (b + m) * 255 });
   }
 
   function applyPalette(palette) {
