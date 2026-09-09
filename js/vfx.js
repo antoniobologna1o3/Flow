@@ -102,55 +102,170 @@ const VFX = (() => {
     return { start, stop, setQuality, resize };
   })();
 
+  /* ---------------- generated textures ---------------- */
+  // Drawn once into a canvas rather than shipped as image files, so the
+  // single-file build stays self-contained. White-based so a material's
+  // colour tints them per lane.
+  const Textures = (() => {
+    let tile = null, glow = null, grid = null;
+
+    function tileTexture(THREE) {
+      if (tile) return tile;
+      const S = 128, c = document.createElement("canvas");
+      c.width = c.height = S;
+      const x = c.getContext("2d");
+
+      // body: vertical gradient gives the slab a lit top and shaded base
+      const g = x.createLinearGradient(0, 0, 0, S);
+      g.addColorStop(0, "#ffffff");
+      g.addColorStop(0.18, "#e8e8ff");
+      g.addColorStop(0.55, "#9d9dc8");
+      g.addColorStop(1, "#5a5a86");
+      roundRect(x, 4, 4, S - 8, S - 8, 18);
+      x.fillStyle = g; x.fill();
+
+      // top bevel highlight
+      x.globalCompositeOperation = "lighter";
+      const hl = x.createLinearGradient(0, 4, 0, S * 0.34);
+      hl.addColorStop(0, "rgba(255,255,255,.85)");
+      hl.addColorStop(1, "rgba(255,255,255,0)");
+      roundRect(x, 8, 6, S - 16, S * 0.32, 14);
+      x.fillStyle = hl; x.fill();
+
+      // diagonal sheen
+      const sh = x.createLinearGradient(0, S, S, 0);
+      sh.addColorStop(0.36, "rgba(255,255,255,0)");
+      sh.addColorStop(0.5, "rgba(255,255,255,.3)");
+      sh.addColorStop(0.64, "rgba(255,255,255,0)");
+      x.fillStyle = sh; x.fillRect(0, 0, S, S);
+      x.globalCompositeOperation = "source-over";
+
+      // inner rim
+      roundRect(x, 5, 5, S - 10, S - 10, 17);
+      x.strokeStyle = "rgba(255,255,255,.55)"; x.lineWidth = 2; x.stroke();
+
+      // fine grain so large tiles do not read as flat plastic
+      const img = x.getImageData(0, 0, S, S), d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (Math.random() - 0.5) * 14;
+        d[i] += n; d[i + 1] += n; d[i + 2] += n;
+      }
+      x.putImageData(img, 0, 0);
+
+      tile = new THREE.CanvasTexture(c);
+      tile.anisotropy = 1;
+      return tile;
+    }
+
+    function glowTexture(THREE) {
+      if (glow) return glow;
+      const S = 64, c = document.createElement("canvas");
+      c.width = c.height = S;
+      const x = c.getContext("2d");
+      const g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+      g.addColorStop(0, "rgba(255,255,255,.9)");
+      g.addColorStop(0.4, "rgba(255,255,255,.35)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      x.fillStyle = g; x.fillRect(0, 0, S, S);
+      glow = new THREE.CanvasTexture(c);
+      return glow;
+    }
+
+    // One scrolling texture replaces what used to be 26 separate meshes.
+    function gridTexture(THREE) {
+      if (grid) return grid;
+      const W = 8, H = 128, c = document.createElement("canvas");
+      c.width = W; c.height = H;
+      const x = c.getContext("2d");
+      x.clearRect(0, 0, W, H);
+      x.fillStyle = "rgba(255,255,255,.85)";
+      x.fillRect(0, 0, W, 3);
+      grid = new THREE.CanvasTexture(c);
+      grid.wrapS = grid.wrapT = THREE.RepeatWrapping;
+      return grid;
+    }
+
+    function roundRect(x, px, py, w, h, r) {
+      x.beginPath();
+      x.moveTo(px + r, py);
+      x.arcTo(px + w, py, px + w, py + h, r);
+      x.arcTo(px + w, py + h, px, py + h, r);
+      x.arcTo(px, py + h, px, py, r);
+      x.arcTo(px, py, px + w, py, r);
+      x.closePath();
+    }
+
+    return { tileTexture, glowTexture, gridTexture };
+  })();
+
   /* ---------------- pooled 3D gameplay effects ---------------- */
   function createPools(scene, THREE) {
-    const sparkGeo = new THREE.PlaneGeometry(0.09, 0.09);
-    const ringGeo = new THREE.RingGeometry(0.28, 0.36, 22);
     const MAX_SPARKS = 220;
     const MAX_RINGS = 14;
 
+    // Sparks are one InstancedMesh instead of 220 separate meshes — the
+    // single biggest draw-call saving in the whole scene.
+    const sparkGeo = new THREE.PlaneGeometry(0.1, 0.1);
+    const sparkMat = new THREE.MeshBasicMaterial({
+      map: Textures.glowTexture(THREE), transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, vertexColors: true,
+    });
+    const sparkMesh = new THREE.InstancedMesh(sparkGeo, sparkMat, MAX_SPARKS);
+    sparkMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    sparkMesh.frustumCulled = false;
+    sparkMesh.count = MAX_SPARKS;
+    const colorAttr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_SPARKS * 3), 3);
+    sparkGeo.setAttribute("color", colorAttr);
+    scene.add(sparkMesh);
+
     const sparks = [];
     for (let i = 0; i < MAX_SPARKS; i++) {
-      const m = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0, depthWrite: false,
-      }));
-      m.visible = false;
-      scene.add(m);
-      sparks.push({ mesh: m, life: 0, max: 1, vel: new THREE.Vector3(), spin: 0 });
+      sparks.push({ life: 0, max: 1, alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), spin: 0, rot: 0, scale: 1 });
     }
 
+    const ringGeo = new THREE.RingGeometry(0.28, 0.36, 20);
     const rings = [];
     for (let i = 0; i < MAX_RINGS; i++) {
       const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
         color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false,
+        blending: THREE.AdditiveBlending,
       }));
       m.rotation.x = -Math.PI / 2;
       m.visible = false;
       scene.add(m);
-      rings.push({ mesh: m, life: 0, max: 1 });
+      rings.push({ mesh: m, life: 0, max: 1, power: 1 });
     }
 
-    let sparkCursor = 0, ringCursor = 0;
-    let budget = 1; // scaled by quality tier
+    let sparkCursor = 0, ringCursor = 0, budget = 1;
+    const _m = new THREE.Matrix4();
+    const _q = new THREE.Quaternion();
+    const _s = new THREE.Vector3();
+    const _hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+    const _c = new THREE.Color();
 
     function setBudget(b) { budget = b; }
 
     function burst(x, y, z, color, count = 14, power = 1) {
       const n = Math.max(2, Math.round(count * budget));
+      _c.setHex(color);
       for (let i = 0; i < n; i++) {
-        const p = sparks[sparkCursor = (sparkCursor + 1) % MAX_SPARKS];
-        p.mesh.visible = true;
-        p.mesh.position.set(x, y, z);
-        p.mesh.material.color.setHex(color);
-        p.mesh.material.opacity = 1;
-        p.mesh.scale.setScalar(1);
+        const idx = sparkCursor = (sparkCursor + 1) % MAX_SPARKS;
+        const p = sparks[idx];
+        p.alive = true;
+        p.pos.set(x, y, z);
         const ang = Math.random() * Math.PI * 2;
-        const up = 1.6 + Math.random() * 3.2 * power;
-        p.vel.set(Math.cos(ang) * (0.9 + Math.random() * 2.2) * power, up, Math.sin(ang) * (0.7 + Math.random() * 1.6));
+        p.vel.set(
+          Math.cos(ang) * (0.9 + Math.random() * 2.2) * power,
+          1.6 + Math.random() * 3.2 * power,
+          Math.sin(ang) * (0.7 + Math.random() * 1.6)
+        );
         p.spin = (Math.random() - 0.5) * 12;
+        p.rot = 0;
         p.life = 0;
         p.max = 0.4 + Math.random() * 0.42;
+        colorAttr.setXYZ(idx, _c.r, _c.g, _c.b);
       }
+      colorAttr.needsUpdate = true;
     }
 
     function shockwave(x, z, color, power = 1) {
@@ -166,18 +281,31 @@ const VFX = (() => {
     }
 
     function update(dt, camera) {
-      for (const p of sparks) {
-        if (!p.mesh.visible) continue;
+      if (camera) _q.copy(camera.quaternion);
+      let any = false;
+      for (let i = 0; i < MAX_SPARKS; i++) {
+        const p = sparks[i];
+        if (!p.alive) { sparkMesh.setMatrixAt(i, _hidden); continue; }
         p.life += dt;
-        if (p.life >= p.max) { p.mesh.visible = false; continue; }
+        if (p.life >= p.max) {
+          p.alive = false;
+          sparkMesh.setMatrixAt(i, _hidden);
+          any = true;
+          continue;
+        }
         const k = p.life / p.max;
-        p.mesh.position.addScaledVector(p.vel, dt);
+        p.pos.addScaledVector(p.vel, dt);
         p.vel.y -= 9 * dt;
-        p.mesh.material.opacity = (1 - k) * (1 - k);
-        p.mesh.scale.setScalar(1 - k * 0.55);
-        p.mesh.rotation.z += p.spin * dt;
-        if (camera) p.mesh.quaternion.copy(camera.quaternion);
+        p.rot += p.spin * dt;
+        // fade by shrinking, since one shared material can't hold per-instance alpha
+        const sc = (1 - k) * (1 - k) * 1.4;
+        _s.set(sc, sc, sc);
+        _m.compose(p.pos, _q, _s);
+        sparkMesh.setMatrixAt(i, _m);
+        any = true;
       }
+      if (any) sparkMesh.instanceMatrix.needsUpdate = true;
+
       for (const r of rings) {
         if (!r.mesh.visible) continue;
         r.life += dt;
@@ -189,12 +317,17 @@ const VFX = (() => {
     }
 
     function clear() {
-      for (const p of sparks) p.mesh.visible = false;
+      for (let i = 0; i < MAX_SPARKS; i++) {
+        sparks[i].alive = false;
+        sparkMesh.setMatrixAt(i, _hidden);
+      }
+      sparkMesh.instanceMatrix.needsUpdate = true;
       for (const r of rings) r.mesh.visible = false;
     }
 
+    clear();
     return { burst, shockwave, update, clear, setBudget };
   }
 
-  return { Ambient, createPools };
+  return { Ambient, Textures, createPools };
 })();

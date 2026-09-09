@@ -28,11 +28,11 @@ const Game = (() => {
 
   let renderer, scene, camera, clock, pools;
   let receptors = [], laneMats = [], echoMat, hiddenMat, holdMats = [];
-  let spectrumBars = [], highway, highwayGrid, sideWalls = [];
+  let spectrumBars = [], highway, highwayGrid, gridTex = null, sideWalls = [];
   let notePool = [], noteCursor = 0;
   let ghostMarkers = [];
 
-  let quality = "auto", tier = "medium";
+  let quality = "auto", tier = "medium", renderScale = 0;   // 0 = follow tier
   let fpsBuf = [], animId = null;
   let laneCount = 4;
 
@@ -55,34 +55,30 @@ const Game = (() => {
     camera.position.set(0, camBaseY, camBaseZ);
     camera.lookAt(0, 0.2, -6);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const key = new THREE.PointLight(0x7c5cff, 1.6, 26);
-    key.position.set(0, 5, 3);
-    scene.add(key);
-    const rim = new THREE.PointLight(0x5cf0ff, 1.1, 30);
-    rim.position.set(0, 2, -14);
-    scene.add(rim);
-    scene.userData.key = key; scene.userData.rim = rim;
+    // No lights: every material is unlit, which removes all per-pixel
+    // lighting work. The "beat pulse" is done by scaling colours instead.
 
     highway = new THREE.Mesh(
       new THREE.PlaneGeometry(4.2, 40),
-      new THREE.MeshStandardMaterial({ color: 0x0d0c20, roughness: 0.82, metalness: 0.15 })
+      new THREE.MeshBasicMaterial({ color: 0x0d0c20 })
     );
     highway.rotation.x = -Math.PI / 2;
     highway.position.z = -12;
     scene.add(highway);
 
-    // moving grid lines give speed a readable texture
-    highwayGrid = new THREE.Group();
-    for (let i = 0; i < 26; i++) {
-      const bar = new THREE.Mesh(
-        new THREE.PlaneGeometry(4.2, 0.022),
-        new THREE.MeshBasicMaterial({ color: 0x3b3670, transparent: true, opacity: 0.5 })
-      );
-      bar.rotation.x = -Math.PI / 2;
-      bar.position.z = -i * 1.6;
-      highwayGrid.add(bar);
-    }
+    // Speed lines used to be 26 separate meshes; now it's one plane with a
+    // repeating texture scrolled by UV offset — same look, 1 draw call.
+    gridTex = VFX.Textures.gridTexture(THREE);
+    gridTex.repeat.set(1, 25);
+    highwayGrid = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.2, 40),
+      new THREE.MeshBasicMaterial({
+        map: gridTex, color: 0x4a44880, transparent: true, opacity: 0.42, depthWrite: false,
+      })
+    );
+    highwayGrid.material.color.setHex(0x4a4488);
+    highwayGrid.rotation.x = -Math.PI / 2;
+    highwayGrid.position.set(0, 0.014, -12);
     scene.add(highwayGrid);
 
     // side walls — cheap depth cue that reads as a corridor
@@ -126,27 +122,30 @@ const Game = (() => {
       div.position.set(-2 + lw * i, 0.012, -12);
       scene.add(div);
 
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0x7c5cff, emissive: 0x7c5cff, emissiveIntensity: 0.55, roughness: 0.35,
-      });
+      const tileTex = VFX.Textures.tileTexture(THREE);
+      const mat = new THREE.MeshBasicMaterial({ map: tileTex, color: 0x7c5cff });
+      mat.userData.base = 0x7c5cff;
       laneMats.push(mat);
-      holdMats.push(new THREE.MeshStandardMaterial({
-        color: 0x7c5cff, emissive: 0x7c5cff, emissiveIntensity: 0.35,
-        transparent: true, opacity: 0.55, roughness: 0.4,
-      }));
+      const hold = new THREE.MeshBasicMaterial({
+        map: tileTex, color: 0x7c5cff, transparent: true, opacity: 0.6,
+      });
+      hold.userData.base = 0x7c5cff;
+      holdMats.push(hold);
 
-      const rec = new THREE.Mesh(new THREE.BoxGeometry(lw * 0.86, 0.055, 0.42), mat.clone());
+      const recMat = new THREE.MeshBasicMaterial({ map: tileTex, color: 0x7c5cff });
+      recMat.userData.base = 0x7c5cff;
+      const rec = new THREE.Mesh(new THREE.BoxGeometry(lw * 0.86, 0.055, 0.42), recMat);
       rec.position.set(x, 0.05, 2.2);
       scene.add(rec);
       receptors.push(rec);
     }
-    echoMat = new THREE.MeshStandardMaterial({
-      color: 0xc08bff, emissive: 0xc08bff, emissiveIntensity: 0.9, roughness: 0.3,
+    const tileTex = VFX.Textures.tileTexture(THREE);
+    echoMat = new THREE.MeshBasicMaterial({ map: tileTex, color: 0xc08bff });
+    echoMat.userData.base = 0xc08bff;
+    hiddenMat = new THREE.MeshBasicMaterial({
+      map: tileTex, color: 0x2a2550, transparent: true, opacity: 0.16,
     });
-    hiddenMat = new THREE.MeshStandardMaterial({
-      color: 0x2a2550, emissive: 0x120f28, emissiveIntensity: 0.1,
-      transparent: true, opacity: 0.16, roughness: 0.6,
-    });
+    hiddenMat.userData.base = 0x2a2550;
   }
 
   function buildSpectrum(count) {
@@ -155,10 +154,9 @@ const Game = (() => {
     for (let i = 0; i < count; i++) {
       const side = i < count / 2 ? -1 : 1;
       const idx = i % (count / 2);
-      const bar = new THREE.Mesh(
-        new THREE.BoxGeometry(0.17, 1, 0.17),
-        new THREE.MeshStandardMaterial({ color: 0x7c5cff, emissive: 0x7c5cff, emissiveIntensity: 0.5 })
-      );
+      const barMat = new THREE.MeshBasicMaterial({ color: 0x7c5cff });
+      barMat.userData.base = 0x7c5cff;
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.17, 1, 0.17), barMat);
       bar.position.set(side * (3.5 + (idx % 3) * 0.55), 0, 0.4 - idx * 1.7);
       bar.scale.y = 0.1;
       scene.add(bar);
@@ -189,7 +187,7 @@ const Game = (() => {
 
     // the ambient glow that breathes on the beat, sitting behind the track
     backGlow = new THREE.Mesh(
-      new THREE.PlaneGeometry(46, 26),
+      new THREE.PlaneGeometry(34, 18),
       new THREE.MeshBasicMaterial({
         color: 0x7c5cff, transparent: true, opacity: 0.1,
         blending: THREE.AdditiveBlending, depthWrite: false,
@@ -270,9 +268,7 @@ const Game = (() => {
     const g = new THREE.Group();
     const ball = new THREE.Mesh(
       new THREE.SphereGeometry(0.27, 20, 14),
-      new THREE.MeshStandardMaterial({
-        color: 0xffffff, emissive: 0x7c5cff, emissiveIntensity: 1.8, roughness: 0.18, metalness: 0.1,
-      })
+      (() => { const m = new THREE.MeshBasicMaterial({ color: 0xbfa8ff }); m.userData.base = 0xbfa8ff; return m; })()
     );
     g.add(ball);
     const halo = new THREE.Mesh(
@@ -323,7 +319,7 @@ const Game = (() => {
     hopper.ball.scale.set(1 + sq * 0.4 + arc * 0.1, 1 - sq * 0.35 + arc * 0.18, 1 + sq * 0.4);
     hopper.halo.scale.setScalar(1 + arc * 0.5);
     hopper.halo.material.opacity = 0.24 - arc * 0.14;
-    hopper.ball.material.emissiveIntensity = 1.8 + (lastFlowState ? 1.4 : 0) + sq * 1.6;
+    setGlow(hopper.ball.material, 0.85 + (lastFlowState ? 0.5 : 0) + sq * 0.6);
   }
 
   // Each pooled note is a small rig: the beveled body, an additive rim
@@ -383,8 +379,11 @@ const Game = (() => {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     updateCameraBase();
-    const dpr = tier === "low" ? 1 : tier === "medium" ? Math.min(1.4, devicePixelRatio || 1) : Math.min(2, devicePixelRatio || 1);
-    renderer.setPixelRatio(dpr);
+    // Pixel count dominates cost on integrated GPUs, so low tier renders
+    // *below* native and lets the browser upscale. Users can override.
+    const auto = tier === "low" ? 0.65 : tier === "medium" ? 0.9 : Math.min(1.35, devicePixelRatio || 1);
+    const scale = renderScale > 0 ? renderScale : auto;
+    renderer.setPixelRatio(Math.max(0.4, Math.min(2, scale)));
   }
 
   // A tall portrait phone needs a higher, wider camera or the highway
@@ -410,11 +409,15 @@ const Game = (() => {
     if (q !== "auto") applyTier(q);
   }
 
+  function setRenderScale(v) { renderScale = v; onResize(); }
+
+  function setRenderScale(v) { renderScale = v; onResize(); }
+
   function applyTier(t) {
     if (tier === t) return;
     tier = t;
     scene.fog.far = t === "low" ? 17 : t === "medium" ? 22 : 28;
-    highwayGrid.visible = t !== "low";
+    highwayGrid.visible = t === "high";
     sideWalls.forEach((w) => (w.visible = t === "high"));
     const bars = t === "low" ? 0 : t === "medium" ? 16 : 24;
     if (spectrumBars.length !== bars) buildSpectrum(bars);
@@ -429,7 +432,7 @@ const Game = (() => {
     }
     parallax.forEach((r) => (r.visible = t === "high"));
     streaks.forEach((s) => (s.visible = t !== "low"));
-    if (backGlow) backGlow.visible = true;
+    if (backGlow) backGlow.visible = t !== "low";
     noteDetail = t === "low" ? 0 : t === "medium" ? 1 : 2;
     onResize();
     const el = document.getElementById("tier-readout");
@@ -457,25 +460,25 @@ const Game = (() => {
     receptors.forEach((r, i) => {
       const hex = paletteHex[i % paletteHex.length];
       r.material.color.setHex(hex);
-      r.material.emissive.setHex(hex);
+      r.material.userData.base = hex;
     });
     laneMats.forEach((m, i) => {
       const hex = paletteHex[i % paletteHex.length];
-      m.color.setHex(hex); m.emissive.setHex(hex);
-      holdMats[i].color.setHex(hex); holdMats[i].emissive.setHex(hex);
+      m.color.setHex(hex); m.userData.base = hex;
+      holdMats[i].color.setHex(hex); holdMats[i].userData.base = hex;
     });
     spectrumBars.forEach((b, i) => {
       const hex = paletteHex[i % paletteHex.length];
-      b.material.color.setHex(hex); b.material.emissive.setHex(hex);
+      b.material.color.setHex(hex); b.material.userData.base = hex;
     });
-    scene.userData.key.color.setHex(paletteHex[0]);
-    scene.userData.rim.color.setHex(paletteHex[2]);
+
     if (backGlow) backGlow.material.color.setHex(paletteHex[0]);
     if (starField) starField.material.color.setHex(paletteHex[2]);
     parallax.forEach((r, i) => r.material.color.setHex(paletteHex[(i + 1) % paletteHex.length]));
     streaks.forEach((s2) => s2.material.color.setHex(paletteHex[2]));
     if (hopper) {
-      hopper.ball.material.emissive.setHex(paletteHex[0]);
+      hopper.ball.material.userData.base = paletteHex[0];
+      setGlow(hopper.ball.material, 0.9);
       hopper.halo.material.color.setHex(paletteHex[0]);
     }
   }
@@ -608,7 +611,8 @@ const Game = (() => {
       hopper.fromX = hopper.toX = laneX(hopper.lane);
       hopper.group.position.set(hopper.toX, 0.26, rz);
       hopper.t = 1; hopper.fell = 0; hopper.squash = 0;
-      hopper.ball.material.emissive.setHex(paletteHex[0]);
+      hopper.ball.material.userData.base = paletteHex[0];
+      setGlow(hopper.ball.material, 0.9);
       hopper.halo.material.color.setHex(paletteHex[0]);
     }
     // Rewind puts the hit line at the far end, so sit the camera much
@@ -935,10 +939,10 @@ const Game = (() => {
   }
 
   function applyFlowState(on) {
-    receptors.forEach((r) => (r.material.emissiveIntensity = on ? 1.5 : 0.55));
+    receptors.forEach((r) => setGlow(r.material, on ? 1.35 : 0.9));
     scene.fog.color.setHex(on ? 0x150c2e : 0x05040e);
     renderer.setClearColor(on ? 0x120a26 : 0x05040e, 1);
-    scene.userData.key.intensity = on ? 2.6 : 1.6;
+
     AudioEngine.setLayerGain("pad", on ? 0.55 : 0.32);
     AudioEngine.setLayerGain("lead", on ? 0.62 : 0.5);
     if (on) {
@@ -1007,6 +1011,17 @@ const Game = (() => {
     const map = { shake: "opt-shake", particles: "opt-particles", trails: "opt-trails", echo: "opt-echo" };
     const el = document.getElementById(map[name]);
     return el ? el.checked : true;
+  }
+
+  // With unlit materials there is no emissive channel, so "glow" means
+  // scaling the material's base colour. Cheaper, and looks the same on a
+  // dark track.
+  const _glowC = new THREE.Color();
+  function setGlow(mat, intensity) {
+    const base = mat.userData.base;
+    if (base === undefined) return;
+    _glowC.setHex(base).multiplyScalar(Math.max(0.15, intensity));
+    mat.color.copy(_glowC);
   }
 
   function laneX(lane) {
@@ -1122,22 +1137,21 @@ const Game = (() => {
       if (r.userData.flash > 0) {
         r.userData.flash -= dt;
         r.scale.y = 2.4;
-        r.material.emissiveIntensity = 2.2;
+        setGlow(r.material, 1.7);
       } else {
         r.scale.y += (1 - r.scale.y) * Math.min(1, dt * 14);
-        const target = lastFlowState ? 1.5 : 0.55;
-        r.material.emissiveIntensity += (target - r.material.emissiveIntensity) * Math.min(1, dt * 8);
+        const target = lastFlowState ? 1.35 : 0.9;
+        setGlow(r.material, target);
       }
     });
 
     // scrolling grid + beat pulse
-    if (highwayGrid.visible) {
-      const scroll = (nowBeat * UNITS_PER_BEAT * dir) % 1.6;
-      highwayGrid.position.z = scroll;
+    if (highwayGrid.visible && gridTex) {
+      gridTex.offset.y = (-nowBeat * dir * 0.55) % 1;
     }
     const beatPhase = nowBeat - Math.floor(nowBeat);
     const pulse = Math.pow(1 - beatPhase, 3);
-    scene.userData.key.intensity = (lastFlowState ? 2.6 : 1.6) + pulse * 1.1;
+
 
     // spectrum bars driven by the actual output
     if (spectrumBars.length) {
@@ -1157,7 +1171,7 @@ const Game = (() => {
         const target = 0.1 + v * 2.3;
         bar.scale.y += (target - bar.scale.y) * Math.min(1, dt * 16);
         bar.position.y = bar.scale.y / 2;
-        bar.material.emissiveIntensity = 0.3 + v * 1.1;
+        setGlow(bar.material, 0.45 + v * 0.9);
       });
     }
 
@@ -1252,10 +1266,12 @@ const Game = (() => {
   function forceFinish() { if (run && !run.ended) { run.flags.generative = false; finish(); } }
 
   return {
-    init, setQualityPref, startRun, togglePause, quit, forceFinish,
+    init, setQualityPref, setRenderScale, startRun, togglePause, quit, forceFinish,
     setOnFinish: (fn) => { onFinish = fn; },
     setOnChainAdvance: (fn) => { onChainAdvance = fn; },
     applyPalette, isEndless: endless,
     getRun: () => run,
+    // draw-call / triangle counts, for the perf readout and for tuning
+    stats: () => (renderer ? { ...renderer.info.render, programs: renderer.info.programs ? renderer.info.programs.length : 0 } : null),
   };
 })();

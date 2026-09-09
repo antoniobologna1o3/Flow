@@ -49,6 +49,10 @@ beside you as a translucent rival, including the exact bar where it broke.
 axes at once: hit windows widen, score doubles, and the lead voice starts
 harmonizing itself in octaves and fifths.
 
+The lead being player-gated doesn't mean silence when you miss: drums, bass,
+pads *and a scheduled arpeggio counter-melody* always play, so the track
+stands up as music on its own. Your hits are the top line on top of it.
+
 ## Modes
 
 | Mode | What it is |
@@ -67,6 +71,11 @@ harmonizing itself in octaves and fifths.
 
 ## Your Music
 
+A Steam-Big-Picture-style shelf: a grid of large cover tiles with a hero
+panel for whatever's focused (click once to focus, again to play). Search is
+filterable by **All / Songs / Artists** — the Artists filter also groups the
+shelf under artist headings.
+
 Drag in songs — one, a selection, or an entire folder — or use the **Folder**
 button. Flow:
 
@@ -83,8 +92,10 @@ button. Flow:
   every song's stage looks like its cover;
 - **generates a cover** from the title/artist hash when no art is supplied, in
   the game's own palette family, so the library never has blank tiles;
-- syncs a **right-hand lyrics panel** from a `.lrc` (timestamped) or plain
-  `.txt` file, karaoke-style;
+- syncs a **right-hand lyrics panel**, karaoke-style. Lyrics don't need a
+  file: hit **Lyrics** on any song to paste them in, or fetch timed lyrics
+  from [LRCLIB](https://lrclib.net) (free and key-less) with one click. A
+  matching `.lrc` dropped alongside the audio still works too;
 - stores everything in IndexedDB — nothing is uploaded anywhere.
 
 If a file can't be decoded (a DRM-protected purchase, an exotic codec), Flow
@@ -130,7 +141,18 @@ Built to stay smooth on old laptops without dropping quality on good ones:
   layers draw at all — or pick a tier manually in Settings;
 - every note mesh, spark and shockwave comes from a **pre-allocated pool**, so
   gameplay never allocates mid-run (the usual cause of stutter);
+- **no lighting at all** — every material is unlit, so there is zero per-pixel
+  lighting work; the beat pulse is done by scaling colours instead;
+- sparks are a single **InstancedMesh** (one draw call, not 220) and the
+  speed-line grid is one UV-scrolled plane (not 26 meshes); a full high-tier
+  frame is ~69 draw calls;
+- a **Resolution** slider renders below native and upscales — the single
+  biggest win on integrated GPUs, and low tier does it automatically;
 - one vendored dependency, no post-processing passes, no shadow maps.
+
+If the browser suspends the audio context, the gameplay clock falls back to
+the wall clock and rejoins the audio clock when it returns, so a stalled
+context can never freeze the notes on screen.
 
 ## Layout
 

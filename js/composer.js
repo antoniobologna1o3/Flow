@@ -123,6 +123,22 @@ const Composer = (() => {
         dur: 3.6, gain: 1,
       });
 
+      // --- arpeggio: a scheduled counter-melody over the chord, so the
+      // track stands up as music on its own even if the player never
+      // lands the lead line ---
+      const arpTones = [0, 2, 4, 2];
+      const arpStep = energy > 0.65 ? 0.25 : 0.5;
+      for (let a = 0, i = 0; a < 4; a += arpStep, i++) {
+        if (energy < 0.3 && i % 2) continue;             // thin it out when quiet
+        const oct = 4 + (i % 4 === 3 ? 1 : 0);
+        out.arp.push({
+          beat: barBeat + a,
+          freq: freq(rootSemi + degreeToSemis(scale, chordDeg + arpTones[i % arpTones.length]), oct),
+          dur: arpStep * 0.9,
+          gain: (0.5 + energy * 0.5) * (i % 4 === 0 ? 1 : 0.75),
+        });
+      }
+
       // --- lead / chart: the melody the player performs ---
       const slots = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5];
       const sixteenths = syncopation ? [0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75] : [];
@@ -173,7 +189,7 @@ const Composer = (() => {
     const laneCount = spec.laneCount || 4;
     const progression = PROGRESSIONS[(spec.seed || 1) % PROGRESSIONS.length];
 
-    const out = { drums: [], bass: [], pad: [], lead: [] };
+    const out = { drums: [], bass: [], pad: [], arp: [], lead: [] };
     let beat = 0;
 
     // Arrangement: intro -> verse -> lift -> chorus -> break -> chorus -> outro
@@ -223,7 +239,7 @@ const Composer = (() => {
       bpm: spec.bpm,
       beats: beat,
       duration: (beat * 60) / spec.bpm,
-      layers: { drums: out.drums, bass: out.bass, pad: out.pad },
+      layers: { drums: out.drums, bass: out.bass, pad: out.pad, arp: out.arp },
       lead: out.lead,
       sections,
       key: `${spec.root} ${spec.scale}`,
@@ -235,7 +251,7 @@ const Composer = (() => {
     const rng = mulberry32(Math.floor(startBeat * 7919) ^ (state.seed || 3));
     const scale = SCALES[state.scale] || SCALES.minor;
     const rootSemi = NAMES.indexOf(state.root || "A");
-    const out = { drums: [], bass: [], pad: [], lead: [] };
+    const out = { drums: [], bass: [], pad: [], arp: [], lead: [] };
     const progression = PROGRESSIONS[(state.seed || 3) % PROGRESSIONS.length];
     const endBeat = buildSection({
       rng, scale, rootSemi, bars,
@@ -248,7 +264,7 @@ const Composer = (() => {
       syncopation: (state.density || 0.9) > 0.8,
     }, out, startBeat);
     out.lead.sort((a, b) => a.beat - b.beat);
-    return { layers: { drums: out.drums, bass: out.bass, pad: out.pad }, lead: out.lead, untilBeat: endBeat, startBeat, bpm };
+    return { layers: { drums: out.drums, bass: out.bass, pad: out.pad, arp: out.arp }, lead: out.lead, untilBeat: endBeat, startBeat, bpm };
   }
 
   return { compose, generateBars, SCALES, PROGRESSIONS };

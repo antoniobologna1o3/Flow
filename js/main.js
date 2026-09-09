@@ -44,11 +44,19 @@
 
     document.querySelectorAll(".choice-card").forEach((c) => {
       c.addEventListener("click", () => {
+        // First real gesture of the session: release the audio context here
+        // so it's long since running by the time a song needs to schedule.
+        try { AudioEngine.unlock(); } catch (e) { console.warn(e); }
         setPlatform(c.dataset.platform);
         renderMenu();
         go("screen-menu");
       });
     });
+
+    // Any later tap also counts, in case the first one was swallowed.
+    const nudge = () => { try { AudioEngine.unlock(); } catch (e) {} };
+    addEventListener("pointerdown", nudge, { capture: true });
+    addEventListener("keydown", nudge, { capture: true });
 
     setPlatform(saved || guessed);
   }
@@ -324,43 +332,177 @@
   }
 
   /* ---------------- library ---------------- */
+  let libFilter = "all";       // all | title | artist
+  let libTracks = [];
+  let selectedId = null;
+
   async function refreshLibrary(query) {
-    const all = await Library.getAll();
+    let all = [];
+    try { all = await Library.getAll(); } catch (e) { console.warn(e); }
+    libTracks = all;
     libraryCount = all.length;
-    const shown = query ? Library.search(all, query) : all;
-    renderLibrary(shown, all.length);
+    renderLibrary(query !== undefined ? query : $("library-search").value);
   }
 
-  function renderLibrary(tracks, totalCount) {
-    const list = $("library-list");
-    $("library-empty").classList.toggle("hidden", totalCount > 0);
-    list.innerHTML = "";
-    tracks.forEach((t, i) => {
-      const row = document.createElement("div");
-      row.className = "track-row";
-      row.style.animationDelay = Math.min(i, 12) * 0.03 + "s";
-      row.style.setProperty("--row-accent", t.palette.primary);
-      row.innerHTML = `
-        <img class="track-art" src="${t.artDataUrl}" alt="" />
-        <div class="track-meta">
-          <div class="track-title">${esc(t.title)}</div>
-          <div class="track-artist">${esc(t.artist)}</div>
-          <div class="track-tags">
-            ${t.lyricsText ? '<span class="track-tag">LYRICS</span>' : ""}
-            ${t.generatedArt ? '<span class="track-tag">GEN COVER</span>' : '<span class="track-tag">COVER</span>'}
-          </div>
+  function matches(t, q) {
+    if (!q) return true;
+    const needle = q.trim().toLowerCase();
+    if (!needle) return true;
+    const title = (t.title || "").toLowerCase();
+    const artist = (t.artist || "").toLowerCase();
+    const album = (t.album || "").toLowerCase();
+    if (libFilter === "title") return title.includes(needle);
+    if (libFilter === "artist") return artist.includes(needle);
+    return title.includes(needle) || artist.includes(needle) || album.includes(needle);
+  }
+
+  function renderLibrary(query) {
+    const grid = $("library-grid");
+    const empty = $("library-empty");
+    empty.classList.toggle("hidden", libTracks.length > 0);
+    grid.innerHTML = "";
+
+    const shown = libTracks.filter((t) => matches(t, query));
+
+    // "Artists" groups the shelf by artist, like a real library view
+    let items = [];
+    if (libFilter === "artist") {
+      const byArtist = new Map();
+      for (const t of shown) {
+        const key = t.artist || "Unknown Artist";
+        if (!byArtist.has(key)) byArtist.set(key, []);
+        byArtist.get(key).push(t);
+      }
+      [...byArtist.keys()].sort((a, b) => a.localeCompare(b)).forEach((artist) => {
+        items.push({ group: artist, count: byArtist.get(artist).length });
+        items.push(...byArtist.get(artist));
+      });
+    } else {
+      items = shown;
+    }
+
+    items.forEach((t, i) => {
+      if (t.group) {
+        const h = document.createElement("div");
+        h.className = "bp-group";
+        h.textContent = `${t.group} · ${t.count} song${t.count === 1 ? "" : "s"}`;
+        grid.appendChild(h);
+        return;
+      }
+      const tile = document.createElement("button");
+      tile.className = "bp-tile" + (t.id === selectedId ? " selected" : "");
+      tile.style.animationDelay = Math.min(i, 14) * 0.025 + "s";
+      tile.innerHTML = `
+        <div class="bp-cover">
+          ${t.lyricsText ? '<span class="bp-badge">LYRICS</span>' : ""}
+          <img src="${t.artDataUrl}" alt="" loading="lazy" />
         </div>
-        <button class="track-del" aria-label="Delete">✕</button>`;
-      row.addEventListener("click", (e) => {
-        if (e.target.closest(".track-del")) return;
-        playTrack(t);
+        <span class="bp-name">${esc(t.title)}</span>
+        <span class="bp-sub">${esc(t.artist)}</span>`;
+      // first click focuses it in the hero, second click plays — so you can
+      // browse covers without committing to a run
+      tile.addEventListener("click", () => {
+        if (selectedId === t.id) playTrack(t);
+        else { selectedId = t.id; showHero(t); renderLibrary(query); }
       });
-      row.querySelector(".track-del").addEventListener("click", async (e) => {
-        e.stopPropagation();
-        await Library.remove(t.id);
-        refreshLibrary($("library-search").value);
-      });
-      list.appendChild(row);
+      tile.addEventListener("dblclick", () => playTrack(t));
+      grid.appendChild(tile);
+    });
+
+    $("lib-count").textContent = libTracks.length
+      ? `${shown.length} of ${libTracks.length} song${libTracks.length === 1 ? "" : "s"}` +
+        (query ? ` matching "${query}"` : "")
+      : "";
+
+    const sel = libTracks.find((t) => t.id === selectedId);
+    if (sel && shown.includes(sel)) showHero(sel);
+    else if (shown.length) { selectedId = shown[0].id; showHero(shown[0]); }
+    else { selectedId = null; $("lib-hero").classList.add("hidden"); }
+  }
+
+  function showHero(t) {
+    const hero = $("lib-hero");
+    hero.classList.remove("hidden");
+    $("hero-art").src = t.artDataUrl;
+    $("hero-title").textContent = t.title;
+    $("hero-artist").textContent = t.artist;
+    $("hero-album").textContent = t.album || "";
+    hero.style.setProperty("--hero-glow", t.palette.primary);
+
+    const best = Persist.getBest("library", t.id);
+    const meta = [];
+    if (best) meta.push(`BEST ${best.score.toLocaleString()} · ${best.grade}`);
+    meta.push(t.lyricsText ? "LYRICS" : "NO LYRICS");
+    meta.push(t.embeddedArt ? "EMBEDDED ART" : t.generatedArt ? "GENERATED ART" : "COVER");
+    $("hero-meta").innerHTML = meta.map((m) => `<span>${esc(m)}</span>`).join("");
+
+    $("hero-play").onclick = () => playTrack(t);
+    $("hero-lyrics").onclick = () => openLyricsEditor(t);
+    $("hero-delete").onclick = async () => {
+      await Library.remove(t.id);
+      selectedId = null;
+      await refreshLibrary();
+      renderMenu();
+    };
+  }
+
+  /* ---------------- lyrics without uploading a file ---------------- */
+  let lyricsTarget = null;
+
+  function openLyricsEditor(t) {
+    lyricsTarget = t;
+    $("lyr-song").textContent = t.title;
+    $("lyr-text").value = t.lyricsText || "";
+    $("lyr-status").textContent = "";
+    $("lyr-status").className = "lyr-status";
+    $("modal-lyrics").classList.remove("hidden");
+  }
+
+  async function fetchLyrics() {
+    if (!lyricsTarget) return;
+    const status = $("lyr-status");
+    status.className = "lyr-status";
+    status.textContent = "Searching LRCLIB…";
+    const t = lyricsTarget;
+    try {
+      // LRCLIB is a free, open, key-less lyrics database with CORS enabled.
+      const url = "https://lrclib.net/api/search?track_name=" +
+        encodeURIComponent(t.title) + "&artist_name=" + encodeURIComponent(t.artist || "");
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const list = await res.json();
+      if (!Array.isArray(list) || !list.length) {
+        status.className = "lyr-status bad";
+        status.textContent = "No match found — paste lyrics below instead.";
+        return;
+      }
+      const hit = list.find((x) => x.syncedLyrics) || list[0];
+      const text = hit.syncedLyrics || hit.plainLyrics || "";
+      if (!text) {
+        status.className = "lyr-status bad";
+        status.textContent = "Found the song but it has no lyrics stored.";
+        return;
+      }
+      $("lyr-text").value = text;
+      status.className = "lyr-status ok";
+      status.textContent = (hit.syncedLyrics ? "Synced" : "Plain") +
+        " lyrics found: " + (hit.trackName || t.title) + " — " + (hit.artistName || "");
+    } catch (err) {
+      status.className = "lyr-status bad";
+      status.textContent = "Couldn't reach LRCLIB (offline, or blocked). Paste lyrics below.";
+    }
+  }
+
+  function wireLyricsEditor() {
+    $("lyr-fetch").addEventListener("click", fetchLyrics);
+    $("lyr-cancel").addEventListener("click", () => $("modal-lyrics").classList.add("hidden"));
+    $("lyr-clear").addEventListener("click", () => { $("lyr-text").value = ""; });
+    $("lyr-save").addEventListener("click", async () => {
+      if (!lyricsTarget) return;
+      const text = $("lyr-text").value.trim();
+      await Library.updateTrack(lyricsTarget.id, { lyricsText: text || null });
+      $("modal-lyrics").classList.add("hidden");
+      await refreshLibrary();
     });
   }
 
@@ -469,7 +611,7 @@
       return;
     }
 
-    await refreshLibrary($("library-search").value);
+    await refreshLibrary();
     renderMenu();
 
     if (!result.total) {
@@ -523,7 +665,19 @@
 
     $("error-close").addEventListener("click", () => $("error-toast").classList.add("hidden"));
 
-    $("library-search").addEventListener("input", (e) => refreshLibrary(e.target.value));
+    $("library-search").addEventListener("input", (e) => renderLibrary(e.target.value));
+
+    $("filter-chips").addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      libFilter = chip.dataset.filter;
+      document.querySelectorAll("#filter-chips .chip").forEach((c) => c.classList.toggle("active", c === chip));
+      const ph = { all: "Search your music…", title: "Search song titles…", artist: "Search artists…" };
+      $("library-search").placeholder = ph[libFilter];
+      renderLibrary($("library-search").value);
+    });
+
+    wireLyricsEditor();
 
     $("btn-add-track").addEventListener("click", () => $("file-batch").click());
   }
@@ -647,6 +801,38 @@
       el.checked = Persist.getSetting(k, true);
       el.addEventListener("change", () => Persist.setSetting(k, el.checked));
     });
+
+    const res = $("opt-render");
+    res.value = Persist.getSetting("renderScale", 0);
+    const showRes = () => { $("res-val").textContent = +res.value === 0 ? "Auto" : res.value + "%"; };
+    showRes();
+    Game.setRenderScale(+res.value / 100);
+    res.addEventListener("input", () => {
+      showRes();
+      Game.setRenderScale(+res.value / 100);
+      Persist.setSetting("renderScale", +res.value);
+    });
+
+    const vol = $("opt-volume");
+    vol.value = Persist.getSetting("volume", 85);
+    $("vol-val").textContent = vol.value + "%";
+    AudioEngine.setMasterVolume(vol.value / 100);
+    vol.addEventListener("input", () => {
+      $("vol-val").textContent = vol.value + "%";
+      AudioEngine.setMasterVolume(vol.value / 100);
+      Persist.setSetting("volume", +vol.value);
+    });
+
+    // If the browser is still holding audio hostage, say so and offer a fix
+    // rather than letting the player think the game just has no music.
+    const blockedBtn = $("audio-blocked");
+    blockedBtn.addEventListener("click", async () => {
+      await AudioEngine.unlock();
+      if (!AudioEngine.audioBlocked()) blockedBtn.classList.add("hidden");
+    });
+    setInterval(() => {
+      blockedBtn.classList.toggle("hidden", !AudioEngine.audioBlocked());
+    }, 1000);
 
     const off = $("opt-offset");
     off.value = Persist.getSetting("offset", 0);

@@ -106,6 +106,14 @@
       </select>
     </label>
     <label class="setting-row">
+      <span>Resolution<small id="res-val">Auto</small><small>Lower = much faster on weak laptops</small></span>
+      <input type="range" id="opt-render" min="0" max="150" step="5" value="0" />
+    </label>
+    <label class="setting-row">
+      <span>Volume<small id="vol-val">85%</small></span>
+      <input type="range" id="opt-volume" min="0" max="120" step="5" value="85" />
+    </label>
+    <label class="setting-row">
       <span>Screen shake</span>
       <input type="checkbox" id="opt-shake" checked />
     </label>
@@ -154,30 +162,76 @@
   </div>
 </section>
 
-<!-- ============ YOUR MUSIC ============ -->
+<!-- ============ YOUR MUSIC — big-picture library ============ -->
 <section id="screen-library" class="screen">
-  <div class="panel-header">
+  <div class="lib-top">
     <button class="back-btn" data-go="screen-menu">←</button>
-    <h2>Your Music</h2>
-  </div>
-  <div class="library-toolbar">
     <div class="search-wrap">
       <span class="search-icon">⌕</span>
-      <input id="library-search" type="search" placeholder="Search artist or title…" autocomplete="off" />
+      <input id="library-search" type="search" placeholder="Search your music…" autocomplete="off" />
+    </div>
+    <div class="filter-chips" id="filter-chips">
+      <button class="chip active" data-filter="all">All</button>
+      <button class="chip" data-filter="title">Songs</button>
+      <button class="chip" data-filter="artist">Artists</button>
     </div>
     <button id="btn-add-folder" class="ghost-btn small">Folder</button>
     <button id="btn-add-track" class="primary-btn small">＋ Add</button>
   </div>
+
+  <div id="lib-hero" class="lib-hero hidden">
+    <div class="hero-art-wrap">
+      <img id="hero-art" alt="" />
+      <div id="hero-glow" class="hero-glow"></div>
+    </div>
+    <div class="hero-info">
+      <div id="hero-album" class="hero-album"></div>
+      <h3 id="hero-title" class="hero-title"></h3>
+      <div id="hero-artist" class="hero-artist"></div>
+      <div id="hero-meta" class="hero-meta"></div>
+      <div class="hero-actions">
+        <button id="hero-play" class="primary-btn">▶ Play</button>
+        <button id="hero-lyrics" class="ghost-btn small">Lyrics</button>
+        <button id="hero-delete" class="ghost-btn small danger">Remove</button>
+      </div>
+    </div>
+  </div>
+
   <div id="library-empty" class="library-empty">
     <div class="empty-art"></div>
     <p>Drag in songs — or a whole folder — and Flow reads each file's own title, artist and cover art, builds a chart from its waveform, and paints the stage with the cover's colours.<br><br>MP3 · M4A · FLAC · OGG · WAV</p>
+    <button id="btn-streaming" class="streaming-link">Why can't I connect Spotify or Apple Music?</button>
   </div>
-  <button id="btn-streaming" class="streaming-link">Why can't I connect Spotify or Apple Music?</button>
-  <div id="library-list" class="library-list"></div>
+
+  <div id="library-grid" class="library-grid"></div>
+  <div id="lib-count" class="lib-count"></div>
 
   <input type="file" id="file-batch" accept="audio/*,image/*,.lrc,.txt,.mp3,.m4a,.flac,.ogg,.opus,.wav" multiple class="hidden-input" />
   <input type="file" id="file-folder" webkitdirectory directory multiple class="hidden-input" />
 </section>
+
+<!-- ============ LYRICS EDITOR (no file needed) ============ -->
+<div id="modal-lyrics" class="modal hidden">
+  <div class="modal-card wide">
+    <h3>Lyrics — <span id="lyr-song"></span></h3>
+    <p class="modal-note">
+      Paste lyrics straight in, or fetch timed lyrics from LRCLIB (a free, open
+      lyrics database — no account needed). Timestamped <code>[mm:ss.xx]</code>
+      lines scroll in sync; plain text is spread evenly across the song.
+    </p>
+    <div class="lyr-actions">
+      <button id="lyr-fetch" class="primary-btn small">⌕ Find lyrics online</button>
+      <span id="lyr-status" class="lyr-status"></span>
+    </div>
+    <textarea id="lyr-text" class="lyr-text" spellcheck="false"
+      placeholder="[00:12.50]Paste or type lyrics here&#10;[00:15.00]Timestamps are optional"></textarea>
+    <div class="modal-actions">
+      <button id="lyr-clear" class="ghost-btn small danger">Clear</button>
+      <button id="lyr-cancel" class="ghost-btn">Cancel</button>
+      <button id="lyr-save" class="primary-btn">Save lyrics</button>
+    </div>
+  </div>
+</div>
 
 <div id="drop-overlay" class="drop-overlay hidden">
   <div class="drop-inner">
@@ -186,6 +240,8 @@
     <div class="drop-sub">Cover art and titles are read from the files themselves</div>
   </div>
 </div>
+
+<button id="audio-blocked" class="audio-blocked hidden">Sound is blocked by the browser — tap here to enable</button>
 
 <div id="import-toast" class="import-toast hidden">
   <div class="it-bar"><i id="it-fill"></i></div>

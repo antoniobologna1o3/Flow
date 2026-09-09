@@ -78,6 +78,27 @@ const Library = (() => {
     });
   }
 
+  // Patch fields on an existing track (used by the in-app lyrics editor,
+  // so lyrics no longer require a file on disk).
+  async function updateTrack(id, patch) {
+    const d = await db();
+    const rec = await new Promise((resolve, reject) => {
+      const tx = d.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    if (!rec) return null;
+    Object.assign(rec, patch);
+    await new Promise((resolve, reject) => {
+      const tx = d.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put(rec);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    return rec;
+  }
+
   async function remove(id) {
     const d = await db();
     return new Promise((resolve, reject) => {
@@ -208,5 +229,5 @@ const Library = (() => {
     return canvas.toDataURL("image/png");
   }
 
-  return { addTrack, addMany, getAll, remove, search };
+  return { addTrack, addMany, updateTrack, getAll, remove, search };
 })();

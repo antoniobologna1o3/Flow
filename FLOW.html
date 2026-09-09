@@ -54,7 +54,7 @@ button,select,input{ font-family:inherit; color:inherit; }
   100%{ transform:scale(1.12) translate(-4vmax,-3vmax); filter:blur(30px) hue-rotate(38deg); }
 }
 .grain{
-  position:absolute; inset:0; opacity:.035; mix-blend-mode:overlay;
+  position:absolute; inset:0; opacity:.03;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>");
 }
 body.in-game #fx-layer{ display:none; }
@@ -324,27 +324,6 @@ body.in-game #fx-layer{ display:none; }
   align-self:flex-start;
 }
 .streaming-link:hover{ color:var(--p3); }
-.library-list{ flex:1; overflow-y:auto; padding:0 22px 22px; display:flex; flex-direction:column; gap:9px; }
-.track-row{
-  display:flex; align-items:center; gap:13px; background:var(--card); border:1px solid var(--line);
-  border-radius:15px; padding:10px; cursor:pointer; position:relative; overflow:hidden;
-  transition:transform .18s, background .18s, border-color .18s;
-  animation:itemIn .4s backwards;
-}
-.track-row::before{
-  content:""; position:absolute; left:0; top:0; bottom:0; width:3px;
-  background:var(--row-accent,var(--p1)); opacity:0; transition:opacity .2s;
-}
-.track-row:hover{ transform:translateX(5px); background:rgba(255,255,255,.07); }
-.track-row:hover::before{ opacity:1 }
-.track-art{ width:54px; height:54px; border-radius:11px; object-fit:cover; background:#1a1830; flex-shrink:0; }
-.track-meta{ flex:1; min-width:0 }
-.track-title{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-.track-artist{ color:var(--dim); font-size:.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-.track-tags{ display:flex; gap:5px; margin-top:3px }
-.track-tag{ font-size:.58rem; letter-spacing:.1em; color:var(--dimmer); border:1px solid var(--line); border-radius:20px; padding:1px 7px }
-.track-del{ background:none; border:none; color:var(--miss); font-size:1rem; cursor:pointer; padding:9px; opacity:.6 }
-.track-del:hover{ opacity:1 }
 .hidden-input{ display:none }
 
 /* ---------- modal ---------- */
@@ -478,7 +457,7 @@ code{ background:rgba(255,255,255,.08); padding:1px 6px; border-radius:5px; font
 
 /* lyrics — right side */
 .lyrics-panel{
-  position:absolute; top:0; right:0; bottom:0; width:min(320px,32vw); z-index:4;
+  position:absolute; top:0; right:0; bottom:0; width:min(280px,26vw); z-index:4;
   padding:0 20px 0 26px; overflow:hidden; display:flex; align-items:center; pointer-events:none;
   background:linear-gradient(90deg,transparent,rgba(5,4,14,.6) 34%);
   mask:linear-gradient(180deg,transparent,#000 18%,#000 82%,transparent);
@@ -551,7 +530,6 @@ code{ background:rgba(255,255,255,.08); padding:1px 6px; border-radius:5px; font
     linear-gradient(90deg, var(--wash,#7c5cff) 0%, transparent 22%),
     linear-gradient(270deg, var(--wash,#7c5cff) 0%, transparent 22%),
     linear-gradient(0deg, var(--wash,#7c5cff) 0%, transparent 26%);
-  mix-blend-mode:screen;
 }
 .combo-wash.surge{ animation:washSurge .8s ease-out }
 @keyframes washSurge{ 0%{ filter:brightness(3) } 100%{ filter:brightness(1) } }
@@ -666,6 +644,119 @@ code{ background:rgba(255,255,255,.08); padding:1px 6px; border-radius:5px; font
   color:#ffd9e2; font-size:.85rem; line-height:1.6; text-align:left;
 }
 
+.audio-blocked{
+  position:fixed; left:50%; top:calc(var(--safe-t) + 12px); translate:-50% 0; z-index:95;
+  background:#3a1020; border:1px solid color-mix(in srgb, var(--miss) 60%, transparent);
+  color:#ffd9e2; border-radius:20px; padding:9px 16px; font-size:.78rem; cursor:pointer;
+  box-shadow:0 12px 30px rgba(0,0,0,.5); animation:echoWarn 2s ease-in-out infinite;
+}
+
+
+/* ============ Your Music — big-picture library ============ */
+.lib-top{ display:flex; align-items:center; gap:10px; padding:16px 22px 12px; flex-wrap:wrap; }
+.filter-chips{ display:flex; gap:6px; }
+.chip{
+  background:var(--card); border:1px solid var(--line); color:var(--dim);
+  border-radius:20px; padding:7px 14px; font-size:.76rem; cursor:pointer; letter-spacing:.04em;
+  transition:background .18s, color .18s, border-color .18s;
+}
+.chip:hover{ color:var(--text); }
+.chip.active{
+  background:color-mix(in srgb, var(--p1) 26%, transparent); color:#fff;
+  border-color:color-mix(in srgb, var(--p1) 55%, transparent);
+}
+
+/* hero panel for the focused song */
+.lib-hero{
+  display:flex; gap:22px; align-items:center; margin:0 22px 16px; padding:18px;
+  background:linear-gradient(100deg, color-mix(in srgb, var(--p1) 15%, transparent), transparent 70%);
+  border:1px solid var(--line); border-radius:22px;
+  animation:heroIn .35s cubic-bezier(.2,.9,.25,1);
+}
+@keyframes heroIn{ from{ opacity:0; transform:translateY(10px) } }
+.hero-art-wrap{ position:relative; flex-shrink:0; }
+.hero-art-wrap img{
+  width:132px; height:132px; border-radius:16px; object-fit:cover; display:block;
+  box-shadow:0 18px 40px rgba(0,0,0,.55);
+}
+.hero-glow{
+  position:absolute; inset:-18px; border-radius:30px; z-index:-1; filter:blur(26px); opacity:.6;
+  background:var(--hero-glow,var(--p1));
+}
+.hero-info{ min-width:0; flex:1; }
+.hero-album{ font-size:.6rem; letter-spacing:.24em; color:var(--dimmer); text-transform:uppercase; }
+.hero-title{ margin:4px 0 2px; font-size:1.5rem; line-height:1.15; overflow:hidden; text-overflow:ellipsis; }
+.hero-artist{ color:var(--p3); font-size:.95rem; }
+.hero-meta{ display:flex; gap:7px; flex-wrap:wrap; margin-top:9px; }
+.hero-meta span{
+  font-size:.6rem; letter-spacing:.12em; color:var(--dimmer);
+  border:1px solid var(--line); border-radius:20px; padding:3px 9px;
+}
+.hero-actions{ display:flex; gap:9px; margin-top:14px; flex-wrap:wrap; }
+.ghost-btn.danger{ color:var(--miss); border-color:color-mix(in srgb,var(--miss) 35%,transparent); }
+
+/* cover grid */
+.library-grid{
+  flex:1; overflow-y:auto; padding:0 22px 10px; display:grid; gap:16px;
+  grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); align-content:start;
+}
+.bp-tile{
+  background:none; border:none; padding:0; cursor:pointer; text-align:left;
+  animation:cardRise .4s backwards cubic-bezier(.2,.9,.25,1);
+}
+.bp-cover{
+  position:relative; width:100%; aspect-ratio:1; border-radius:14px; overflow:hidden;
+  border:2px solid transparent; background:#16142c;
+  transition:transform .22s cubic-bezier(.2,.9,.25,1), border-color .22s, box-shadow .22s;
+}
+.bp-cover img{ width:100%; height:100%; object-fit:cover; display:block; }
+.bp-cover::after{
+  content:"▶"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  background:rgba(6,5,16,.55); color:#fff; font-size:1.5rem; opacity:0; transition:opacity .2s;
+}
+.bp-tile:hover .bp-cover, .bp-tile:focus-visible .bp-cover{
+  transform:translateY(-6px) scale(1.04);
+  border-color:color-mix(in srgb,var(--p3) 70%,transparent);
+  box-shadow:0 16px 38px rgba(0,0,0,.5);
+}
+.bp-tile:hover .bp-cover::after{ opacity:1; }
+.bp-tile.selected .bp-cover{
+  border-color:var(--p2);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--p2) 30%,transparent), 0 16px 38px rgba(0,0,0,.5);
+}
+.bp-name{ display:block; margin-top:8px; font-size:.82rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bp-sub{ display:block; font-size:.7rem; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bp-badge{
+  position:absolute; top:7px; right:7px; z-index:1; font-size:.55rem; letter-spacing:.1em;
+  background:rgba(6,5,16,.8); border-radius:20px; padding:2px 7px; color:var(--p3);
+}
+.lib-count{ padding:2px 22px 16px; font-size:.7rem; color:var(--dimmer); letter-spacing:.1em; }
+
+/* artist grouping header */
+.bp-group{ grid-column:1/-1; font-size:.66rem; letter-spacing:.24em; color:var(--dimmer);
+  text-transform:uppercase; padding:10px 2px 0; border-top:1px solid var(--line); }
+.bp-group:first-child{ border-top:none; padding-top:0; }
+
+/* lyrics editor */
+.modal-card.wide{ width:min(620px,95vw); }
+.lyr-actions{ display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.lyr-status{ font-size:.76rem; color:var(--dim); }
+.lyr-status.ok{ color:#7cff5c; } .lyr-status.bad{ color:var(--miss); }
+.lyr-text{
+  width:100%; height:230px; resize:vertical; background:var(--card); border:1px solid var(--line);
+  color:var(--text); border-radius:12px; padding:12px; font-size:.85rem; line-height:1.55;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+.lyr-text:focus{ outline:none; border-color:color-mix(in srgb,var(--p1) 55%,transparent); }
+
+@media (max-width:720px){
+  .lib-top{ padding:14px 16px 10px; }
+  .lib-hero{ margin:0 16px 12px; padding:14px; gap:14px; }
+  .hero-art-wrap img{ width:92px; height:92px; }
+  .hero-title{ font-size:1.15rem; }
+  .library-grid{ padding:0 16px 10px; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:12px; }
+}
+
 </style>
 </head>
 <body>
@@ -770,6 +861,14 @@ code{ background:rgba(255,255,255,.08); padding:1px 6px; border-radius:5px; font
       </select>
     </label>
     <label class="setting-row">
+      <span>Resolution<small id="res-val">Auto</small><small>Lower = much faster on weak laptops</small></span>
+      <input type="range" id="opt-render" min="0" max="150" step="5" value="0" />
+    </label>
+    <label class="setting-row">
+      <span>Volume<small id="vol-val">85%</small></span>
+      <input type="range" id="opt-volume" min="0" max="120" step="5" value="85" />
+    </label>
+    <label class="setting-row">
       <span>Screen shake</span>
       <input type="checkbox" id="opt-shake" checked />
     </label>
@@ -818,30 +917,76 @@ code{ background:rgba(255,255,255,.08); padding:1px 6px; border-radius:5px; font
   </div>
 </section>
 
-<!-- ============ YOUR MUSIC ============ -->
+<!-- ============ YOUR MUSIC — big-picture library ============ -->
 <section id="screen-library" class="screen">
-  <div class="panel-header">
+  <div class="lib-top">
     <button class="back-btn" data-go="screen-menu">←</button>
-    <h2>Your Music</h2>
-  </div>
-  <div class="library-toolbar">
     <div class="search-wrap">
       <span class="search-icon">⌕</span>
-      <input id="library-search" type="search" placeholder="Search artist or title…" autocomplete="off" />
+      <input id="library-search" type="search" placeholder="Search your music…" autocomplete="off" />
+    </div>
+    <div class="filter-chips" id="filter-chips">
+      <button class="chip active" data-filter="all">All</button>
+      <button class="chip" data-filter="title">Songs</button>
+      <button class="chip" data-filter="artist">Artists</button>
     </div>
     <button id="btn-add-folder" class="ghost-btn small">Folder</button>
     <button id="btn-add-track" class="primary-btn small">＋ Add</button>
   </div>
+
+  <div id="lib-hero" class="lib-hero hidden">
+    <div class="hero-art-wrap">
+      <img id="hero-art" alt="" />
+      <div id="hero-glow" class="hero-glow"></div>
+    </div>
+    <div class="hero-info">
+      <div id="hero-album" class="hero-album"></div>
+      <h3 id="hero-title" class="hero-title"></h3>
+      <div id="hero-artist" class="hero-artist"></div>
+      <div id="hero-meta" class="hero-meta"></div>
+      <div class="hero-actions">
+        <button id="hero-play" class="primary-btn">▶ Play</button>
+        <button id="hero-lyrics" class="ghost-btn small">Lyrics</button>
+        <button id="hero-delete" class="ghost-btn small danger">Remove</button>
+      </div>
+    </div>
+  </div>
+
   <div id="library-empty" class="library-empty">
     <div class="empty-art"></div>
     <p>Drag in songs — or a whole folder — and Flow reads each file's own title, artist and cover art, builds a chart from its waveform, and paints the stage with the cover's colours.<br><br>MP3 · M4A · FLAC · OGG · WAV</p>
+    <button id="btn-streaming" class="streaming-link">Why can't I connect Spotify or Apple Music?</button>
   </div>
-  <button id="btn-streaming" class="streaming-link">Why can't I connect Spotify or Apple Music?</button>
-  <div id="library-list" class="library-list"></div>
+
+  <div id="library-grid" class="library-grid"></div>
+  <div id="lib-count" class="lib-count"></div>
 
   <input type="file" id="file-batch" accept="audio/*,image/*,.lrc,.txt,.mp3,.m4a,.flac,.ogg,.opus,.wav" multiple class="hidden-input" />
   <input type="file" id="file-folder" webkitdirectory directory multiple class="hidden-input" />
 </section>
+
+<!-- ============ LYRICS EDITOR (no file needed) ============ -->
+<div id="modal-lyrics" class="modal hidden">
+  <div class="modal-card wide">
+    <h3>Lyrics — <span id="lyr-song"></span></h3>
+    <p class="modal-note">
+      Paste lyrics straight in, or fetch timed lyrics from LRCLIB (a free, open
+      lyrics database — no account needed). Timestamped <code>[mm:ss.xx]</code>
+      lines scroll in sync; plain text is spread evenly across the song.
+    </p>
+    <div class="lyr-actions">
+      <button id="lyr-fetch" class="primary-btn small">⌕ Find lyrics online</button>
+      <span id="lyr-status" class="lyr-status"></span>
+    </div>
+    <textarea id="lyr-text" class="lyr-text" spellcheck="false"
+      placeholder="[00:12.50]Paste or type lyrics here&#10;[00:15.00]Timestamps are optional"></textarea>
+    <div class="modal-actions">
+      <button id="lyr-clear" class="ghost-btn small danger">Clear</button>
+      <button id="lyr-cancel" class="ghost-btn">Cancel</button>
+      <button id="lyr-save" class="primary-btn">Save lyrics</button>
+    </div>
+  </div>
+</div>
 
 <div id="drop-overlay" class="drop-overlay hidden">
   <div class="drop-inner">
@@ -850,6 +995,8 @@ code{ background:rgba(255,255,255,.08); padding:1px 6px; border-radius:5px; font
     <div class="drop-sub">Cover art and titles are read from the files themselves</div>
   </div>
 </div>
+
+<button id="audio-blocked" class="audio-blocked hidden">Sound is blocked by the browser — tap here to enable</button>
 
 <div id="import-toast" class="import-toast hidden">
   <div class="it-bar"><i id="it-fill"></i></div>
@@ -1615,9 +1762,35 @@ const AudioEngine = (() => {
     for (const seg of segs) { if (seg.time <= time) s = seg; else break; }
     return s.beat + (time - s.time) / (60 / s.bpm);
   }
+  // Gameplay clock. Normally this is the audio clock, but a suspended or
+  // stalled AudioContext freezes currentTime — which used to freeze every
+  // note on screen. Fall back to the wall clock so the game keeps running,
+  // and re-anchor the timeline when audio comes back so the beat doesn't
+  // jump.
+  let anchorAudio = 0, anchorWall = 0, usingFallback = false;
+  function audioNow() {
+    const wall = performance.now() / 1000;
+    if (ctx && ctx.state === "running") {
+      if (usingFallback) {
+        // Audio just came back: rebase the timeline onto the real clock at
+        // whatever beat the fallback had reached.
+        const beatNow = timeToBeat(anchorAudio + (wall - anchorWall) + offsetMs / 1000);
+        const bpm = segFor(beatNow).bpm;
+        segs = [{ beat: beatNow, time: ctx.currentTime, bpm }];
+        usingFallback = false;
+      }
+      anchorAudio = ctx.currentTime;
+      anchorWall = wall;
+      return ctx.currentTime;
+    }
+    if (!ctx) return 0;
+    usingFallback = true;
+    return anchorAudio + (wall - anchorWall);
+  }
+
   function currentBeat() {
     if (!ctx) return 0;
-    return timeToBeat(ctx.currentTime + offsetMs / 1000);
+    return timeToBeat(audioNow() + offsetMs / 1000);
   }
   function currentBpm() { return segFor(currentBeat()).bpm; }
 
@@ -1647,9 +1820,9 @@ const AudioEngine = (() => {
       delaySend = ctx.createGain(); delaySend.gain.value = 0.2;
       delayNode.connect(delayFB); delayFB.connect(delayNode);
 
-      for (const name of ["drums", "bass", "pad", "lead"]) {
+      for (const name of ["drums", "bass", "pad", "arp", "lead"]) {
         const g = ctx.createGain();
-        g.gain.value = { drums: 0.9, bass: 0.75, pad: 0.32, lead: 0.5 }[name];
+        g.gain.value = { drums: 0.9, bass: 0.75, pad: 0.34, arp: 0.42, lead: 0.55 }[name];
         g.connect(musicBus);
         bus[name] = g;
       }
@@ -1662,8 +1835,45 @@ const AudioEngine = (() => {
       analyser.connect(master);
       master.connect(ctx.destination);
     }
-    if (ctx.state === "suspended") ctx.resume();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
     return ctx;
+  }
+
+  // Browsers hand back a *suspended* AudioContext until a real user
+  // gesture releases it, and a suspended context's currentTime does not
+  // advance. Anchoring a song's timeline to that frozen clock made every
+  // scheduled note look like it was already in the past, so the backing
+  // track was silently dropped while the beat clock ran on. Unlock on the
+  // very first tap, and never start a song until the clock is truly live.
+  function unlock() {
+    ensureCtx();
+    if (ctx.state === "running") return Promise.resolve(true);
+    return ctx.resume().then(() => ctx.state === "running").catch(() => false);
+  }
+
+  function whenRunning(fn) {
+    ensureCtx();
+    if (ctx.state === "running") { fn(); return; }
+    let done = false;
+    const go = () => { if (!done && ctx.state === "running") { done = true; cleanup(); fn(); } };
+    const cleanup = () => {
+      clearInterval(poll);
+      ctx.removeEventListener?.("statechange", go);
+    };
+    ctx.addEventListener?.("statechange", go);
+    ctx.resume().then(go).catch(() => {});
+    const poll = setInterval(() => {
+      go();
+      if (done) clearInterval(poll);
+    }, 120);
+    // Give up waiting after a few seconds so we never hang forever.
+    setTimeout(() => { if (!done) { done = true; cleanup(); fn(); } }, 4000);
+  }
+
+  function audioBlocked() { return !!ctx && ctx.state !== "running"; }
+  function setMasterVolume(v) {
+    ensureCtx();
+    master.gain.setTargetAtTime(Math.max(0, Math.min(1.4, v)), ctx.currentTime, 0.02);
   }
 
   function makeImpulse(seconds, decay) {
@@ -1761,6 +1971,21 @@ const AudioEngine = (() => {
     }
   }
 
+  // Counter-melody pluck. Unlike the lead, this one IS scheduled: the
+  // arrangement has to be music on its own, or a player who misses
+  // everything hears almost nothing.
+  function arpNote(t, freq, dur, gain = 1) {
+    const o = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    o.type = "triangle";
+    o.frequency.value = freq;
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(Math.min(9000, freq * 7), t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(400, freq * 2), t + dur);
+    env(g, t, 0.3 * gain, 0.005, dur * 0.2, dur * 0.9);
+    o.connect(lp); lp.connect(g); g.connect(bus.arp);
+    o.start(t); o.stop(t + dur + 0.25);
+  }
+
   // Lead voice — normally fired live by a player hit, not by the scheduler.
   // quality: 'perfect' | 'great' | 'good' | 'dead'
   function leadNote(freq, quality = "perfect", opts = {}) {
@@ -1796,14 +2021,19 @@ const AudioEngine = (() => {
     stop();
     ensureCtx();
     mode = "synth";
-    song = { layers: { drums: [], bass: [], pad: [] }, ...newSong };
+    song = { layers: { drums: [], bass: [], pad: [], arp: [] }, ...newSong };
+    if (!song.layers.arp) song.layers.arp = [];
     onNeedBars = opts.onNeedBars || null;
     generatedTo = song.beats || 0;
-    cursor = { drums: 0, bass: 0, pad: 0 };
-    resetTimeline(ctx.currentTime + 0.35, song.bpm);
-    playing = true;
-    schedTimer = setInterval(tick, 25);
-    tick();
+    cursor = { drums: 0, bass: 0, pad: 0, arp: 0 };
+    // Don't anchor the timeline until the audio clock is genuinely running.
+    whenRunning(() => {
+      resetTimeline(ctx.currentTime + 0.35, song.bpm);
+      playing = true;
+      clearInterval(schedTimer);
+      schedTimer = setInterval(tick, 25);
+      tick();
+    });
   }
 
   function tick() {
@@ -1811,7 +2041,7 @@ const AudioEngine = (() => {
     const nowBeat = currentBeat();
     const horizon = nowBeat + 2.5;   // schedule ~2.5 beats ahead
 
-    for (const layer of ["drums", "bass", "pad"]) {
+    for (const layer of ["drums", "bass", "pad", "arp"]) {
       const list = song.layers[layer] || [];
       while (cursor[layer] < list.length && list[cursor[layer]].beat <= horizon) {
         const ev = list[cursor[layer]++];
@@ -1823,6 +2053,8 @@ const AudioEngine = (() => {
           else hat(t, ev.gain, ev.kind === "openhat");
         } else if (layer === "bass") {
           bassNote(t, ev.freq, ev.dur, ev.gain);
+        } else if (layer === "arp") {
+          arpNote(t, ev.freq, ev.dur, ev.gain);
         } else {
           padChord(t, ev.freqs, ev.dur, ev.gain);
         }
@@ -1834,8 +2066,11 @@ const AudioEngine = (() => {
       const bpmNow = currentBpm();
       const added = onNeedBars(generatedTo, bpmNow);
       if (added) {
-        for (const layer of ["drums", "bass", "pad"]) {
-          if (added.layers && added.layers[layer]) song.layers[layer].push(...added.layers[layer]);
+        for (const layer of ["drums", "bass", "pad", "arp"]) {
+          if (added.layers && added.layers[layer]) {
+            if (!song.layers[layer]) song.layers[layer] = [];
+            song.layers[layer].push(...added.layers[layer]);
+          }
         }
         generatedTo = added.untilBeat;
         if (added.bpm && Math.abs(added.bpm - bpmNow) > 0.5) pushTempo(added.startBeat, added.bpm);
@@ -1860,15 +2095,17 @@ const AudioEngine = (() => {
     stop();
     ensureCtx();
     mode = "buffer";
-    srcNode = ctx.createBufferSource();
-    srcNode.buffer = decoded;
-    srcNode.connect(musicBus);
-    bufOffset = offset;
-    bufStartCtx = ctx.currentTime + 0.08;
-    resetTimeline(bufStartCtx - offset, bpm);
-    srcNode.start(bufStartCtx, offset);
-    playing = true;
-    srcNode.onended = () => { if (mode === "buffer") playing = false; };
+    whenRunning(() => {
+      srcNode = ctx.createBufferSource();
+      srcNode.buffer = decoded;
+      srcNode.connect(musicBus);
+      bufOffset = offset;
+      bufStartCtx = ctx.currentTime + 0.08;
+      resetTimeline(bufStartCtx - offset, bpm);
+      srcNode.start(bufStartCtx, offset);
+      playing = true;
+      srcNode.onended = () => { if (mode === "buffer") playing = false; };
+    });
   }
 
   // Imported audio can't have its melody gated, so a miss ducks the mix.
@@ -1915,7 +2152,7 @@ const AudioEngine = (() => {
     if (mode === "synth" && song) {
       const bpm = segFor(pausedBeat).bpm;
       segs = [{ beat: pausedBeat, time: ctx.currentTime + 0.2, bpm }];
-      for (const layer of ["drums", "bass", "pad"]) {
+      for (const layer of ["drums", "bass", "pad", "arp"]) {
         const list = song.layers[layer] || [];
         cursor[layer] = list.findIndex((e) => e.beat >= pausedBeat);
         if (cursor[layer] < 0) cursor[layer] = list.length;
@@ -2043,14 +2280,17 @@ const AudioEngine = (() => {
   }
 
   return {
-    ensureCtx, playSong, playBuffer, loadFile, stop, pause, resume,
+    ensureCtx, unlock, audioBlocked, setMasterVolume,
+    playSong, playBuffer, loadFile, stop, pause, resume,
     leadNote, duck, setLayerGain, autoChart,
     currentBeat, beatToTime, timeToBeat, currentBpm, pushTempo,
     getLevel, getSpectrum, binCount: () => (analyser ? analyser.frequencyBinCount : 0),
     isPlaying: () => playing,
+    usingFallbackClock: () => usingFallback,
     setOffset: (ms) => { offsetMs = ms; },
     getOffset: () => offsetMs,
     getMode: () => mode,
+    getContext: () => ctx,
   };
 })();
 
@@ -2182,6 +2422,22 @@ const Composer = (() => {
         dur: 3.6, gain: 1,
       });
 
+      // --- arpeggio: a scheduled counter-melody over the chord, so the
+      // track stands up as music on its own even if the player never
+      // lands the lead line ---
+      const arpTones = [0, 2, 4, 2];
+      const arpStep = energy > 0.65 ? 0.25 : 0.5;
+      for (let a = 0, i = 0; a < 4; a += arpStep, i++) {
+        if (energy < 0.3 && i % 2) continue;             // thin it out when quiet
+        const oct = 4 + (i % 4 === 3 ? 1 : 0);
+        out.arp.push({
+          beat: barBeat + a,
+          freq: freq(rootSemi + degreeToSemis(scale, chordDeg + arpTones[i % arpTones.length]), oct),
+          dur: arpStep * 0.9,
+          gain: (0.5 + energy * 0.5) * (i % 4 === 0 ? 1 : 0.75),
+        });
+      }
+
       // --- lead / chart: the melody the player performs ---
       const slots = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5];
       const sixteenths = syncopation ? [0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75] : [];
@@ -2232,7 +2488,7 @@ const Composer = (() => {
     const laneCount = spec.laneCount || 4;
     const progression = PROGRESSIONS[(spec.seed || 1) % PROGRESSIONS.length];
 
-    const out = { drums: [], bass: [], pad: [], lead: [] };
+    const out = { drums: [], bass: [], pad: [], arp: [], lead: [] };
     let beat = 0;
 
     // Arrangement: intro -> verse -> lift -> chorus -> break -> chorus -> outro
@@ -2282,7 +2538,7 @@ const Composer = (() => {
       bpm: spec.bpm,
       beats: beat,
       duration: (beat * 60) / spec.bpm,
-      layers: { drums: out.drums, bass: out.bass, pad: out.pad },
+      layers: { drums: out.drums, bass: out.bass, pad: out.pad, arp: out.arp },
       lead: out.lead,
       sections,
       key: `${spec.root} ${spec.scale}`,
@@ -2294,7 +2550,7 @@ const Composer = (() => {
     const rng = mulberry32(Math.floor(startBeat * 7919) ^ (state.seed || 3));
     const scale = SCALES[state.scale] || SCALES.minor;
     const rootSemi = NAMES.indexOf(state.root || "A");
-    const out = { drums: [], bass: [], pad: [], lead: [] };
+    const out = { drums: [], bass: [], pad: [], arp: [], lead: [] };
     const progression = PROGRESSIONS[(state.seed || 3) % PROGRESSIONS.length];
     const endBeat = buildSection({
       rng, scale, rootSemi, bars,
@@ -2307,7 +2563,7 @@ const Composer = (() => {
       syncopation: (state.density || 0.9) > 0.8,
     }, out, startBeat);
     out.lead.sort((a, b) => a.beat - b.beat);
-    return { layers: { drums: out.drums, bass: out.bass, pad: out.pad }, lead: out.lead, untilBeat: endBeat, startBeat, bpm };
+    return { layers: { drums: out.drums, bass: out.bass, pad: out.pad, arp: out.arp }, lead: out.lead, untilBeat: endBeat, startBeat, bpm };
   }
 
   return { compose, generateBars, SCALES, PROGRESSIONS };
@@ -2737,6 +2993,27 @@ const Library = (() => {
     });
   }
 
+  // Patch fields on an existing track (used by the in-app lyrics editor,
+  // so lyrics no longer require a file on disk).
+  async function updateTrack(id, patch) {
+    const d = await db();
+    const rec = await new Promise((resolve, reject) => {
+      const tx = d.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    if (!rec) return null;
+    Object.assign(rec, patch);
+    await new Promise((resolve, reject) => {
+      const tx = d.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put(rec);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    return rec;
+  }
+
   async function remove(id) {
     const d = await db();
     return new Promise((resolve, reject) => {
@@ -2867,7 +3144,7 @@ const Library = (() => {
     return canvas.toDataURL("image/png");
   }
 
-  return { addTrack, addMany, getAll, remove, search };
+  return { addTrack, addMany, updateTrack, getAll, remove, search };
 })();
 
 </script>
@@ -3057,55 +3334,170 @@ const VFX = (() => {
     return { start, stop, setQuality, resize };
   })();
 
+  /* ---------------- generated textures ---------------- */
+  // Drawn once into a canvas rather than shipped as image files, so the
+  // single-file build stays self-contained. White-based so a material's
+  // colour tints them per lane.
+  const Textures = (() => {
+    let tile = null, glow = null, grid = null;
+
+    function tileTexture(THREE) {
+      if (tile) return tile;
+      const S = 128, c = document.createElement("canvas");
+      c.width = c.height = S;
+      const x = c.getContext("2d");
+
+      // body: vertical gradient gives the slab a lit top and shaded base
+      const g = x.createLinearGradient(0, 0, 0, S);
+      g.addColorStop(0, "#ffffff");
+      g.addColorStop(0.18, "#e8e8ff");
+      g.addColorStop(0.55, "#9d9dc8");
+      g.addColorStop(1, "#5a5a86");
+      roundRect(x, 4, 4, S - 8, S - 8, 18);
+      x.fillStyle = g; x.fill();
+
+      // top bevel highlight
+      x.globalCompositeOperation = "lighter";
+      const hl = x.createLinearGradient(0, 4, 0, S * 0.34);
+      hl.addColorStop(0, "rgba(255,255,255,.85)");
+      hl.addColorStop(1, "rgba(255,255,255,0)");
+      roundRect(x, 8, 6, S - 16, S * 0.32, 14);
+      x.fillStyle = hl; x.fill();
+
+      // diagonal sheen
+      const sh = x.createLinearGradient(0, S, S, 0);
+      sh.addColorStop(0.36, "rgba(255,255,255,0)");
+      sh.addColorStop(0.5, "rgba(255,255,255,.3)");
+      sh.addColorStop(0.64, "rgba(255,255,255,0)");
+      x.fillStyle = sh; x.fillRect(0, 0, S, S);
+      x.globalCompositeOperation = "source-over";
+
+      // inner rim
+      roundRect(x, 5, 5, S - 10, S - 10, 17);
+      x.strokeStyle = "rgba(255,255,255,.55)"; x.lineWidth = 2; x.stroke();
+
+      // fine grain so large tiles do not read as flat plastic
+      const img = x.getImageData(0, 0, S, S), d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (Math.random() - 0.5) * 14;
+        d[i] += n; d[i + 1] += n; d[i + 2] += n;
+      }
+      x.putImageData(img, 0, 0);
+
+      tile = new THREE.CanvasTexture(c);
+      tile.anisotropy = 1;
+      return tile;
+    }
+
+    function glowTexture(THREE) {
+      if (glow) return glow;
+      const S = 64, c = document.createElement("canvas");
+      c.width = c.height = S;
+      const x = c.getContext("2d");
+      const g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+      g.addColorStop(0, "rgba(255,255,255,.9)");
+      g.addColorStop(0.4, "rgba(255,255,255,.35)");
+      g.addColorStop(1, "rgba(255,255,255,0)");
+      x.fillStyle = g; x.fillRect(0, 0, S, S);
+      glow = new THREE.CanvasTexture(c);
+      return glow;
+    }
+
+    // One scrolling texture replaces what used to be 26 separate meshes.
+    function gridTexture(THREE) {
+      if (grid) return grid;
+      const W = 8, H = 128, c = document.createElement("canvas");
+      c.width = W; c.height = H;
+      const x = c.getContext("2d");
+      x.clearRect(0, 0, W, H);
+      x.fillStyle = "rgba(255,255,255,.85)";
+      x.fillRect(0, 0, W, 3);
+      grid = new THREE.CanvasTexture(c);
+      grid.wrapS = grid.wrapT = THREE.RepeatWrapping;
+      return grid;
+    }
+
+    function roundRect(x, px, py, w, h, r) {
+      x.beginPath();
+      x.moveTo(px + r, py);
+      x.arcTo(px + w, py, px + w, py + h, r);
+      x.arcTo(px + w, py + h, px, py + h, r);
+      x.arcTo(px, py + h, px, py, r);
+      x.arcTo(px, py, px + w, py, r);
+      x.closePath();
+    }
+
+    return { tileTexture, glowTexture, gridTexture };
+  })();
+
   /* ---------------- pooled 3D gameplay effects ---------------- */
   function createPools(scene, THREE) {
-    const sparkGeo = new THREE.PlaneGeometry(0.09, 0.09);
-    const ringGeo = new THREE.RingGeometry(0.28, 0.36, 22);
     const MAX_SPARKS = 220;
     const MAX_RINGS = 14;
 
+    // Sparks are one InstancedMesh instead of 220 separate meshes — the
+    // single biggest draw-call saving in the whole scene.
+    const sparkGeo = new THREE.PlaneGeometry(0.1, 0.1);
+    const sparkMat = new THREE.MeshBasicMaterial({
+      map: Textures.glowTexture(THREE), transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, vertexColors: true,
+    });
+    const sparkMesh = new THREE.InstancedMesh(sparkGeo, sparkMat, MAX_SPARKS);
+    sparkMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    sparkMesh.frustumCulled = false;
+    sparkMesh.count = MAX_SPARKS;
+    const colorAttr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_SPARKS * 3), 3);
+    sparkGeo.setAttribute("color", colorAttr);
+    scene.add(sparkMesh);
+
     const sparks = [];
     for (let i = 0; i < MAX_SPARKS; i++) {
-      const m = new THREE.Mesh(sparkGeo, new THREE.MeshBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0, depthWrite: false,
-      }));
-      m.visible = false;
-      scene.add(m);
-      sparks.push({ mesh: m, life: 0, max: 1, vel: new THREE.Vector3(), spin: 0 });
+      sparks.push({ life: 0, max: 1, alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), spin: 0, rot: 0, scale: 1 });
     }
 
+    const ringGeo = new THREE.RingGeometry(0.28, 0.36, 20);
     const rings = [];
     for (let i = 0; i < MAX_RINGS; i++) {
       const m = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
         color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false,
+        blending: THREE.AdditiveBlending,
       }));
       m.rotation.x = -Math.PI / 2;
       m.visible = false;
       scene.add(m);
-      rings.push({ mesh: m, life: 0, max: 1 });
+      rings.push({ mesh: m, life: 0, max: 1, power: 1 });
     }
 
-    let sparkCursor = 0, ringCursor = 0;
-    let budget = 1; // scaled by quality tier
+    let sparkCursor = 0, ringCursor = 0, budget = 1;
+    const _m = new THREE.Matrix4();
+    const _q = new THREE.Quaternion();
+    const _s = new THREE.Vector3();
+    const _hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+    const _c = new THREE.Color();
 
     function setBudget(b) { budget = b; }
 
     function burst(x, y, z, color, count = 14, power = 1) {
       const n = Math.max(2, Math.round(count * budget));
+      _c.setHex(color);
       for (let i = 0; i < n; i++) {
-        const p = sparks[sparkCursor = (sparkCursor + 1) % MAX_SPARKS];
-        p.mesh.visible = true;
-        p.mesh.position.set(x, y, z);
-        p.mesh.material.color.setHex(color);
-        p.mesh.material.opacity = 1;
-        p.mesh.scale.setScalar(1);
+        const idx = sparkCursor = (sparkCursor + 1) % MAX_SPARKS;
+        const p = sparks[idx];
+        p.alive = true;
+        p.pos.set(x, y, z);
         const ang = Math.random() * Math.PI * 2;
-        const up = 1.6 + Math.random() * 3.2 * power;
-        p.vel.set(Math.cos(ang) * (0.9 + Math.random() * 2.2) * power, up, Math.sin(ang) * (0.7 + Math.random() * 1.6));
+        p.vel.set(
+          Math.cos(ang) * (0.9 + Math.random() * 2.2) * power,
+          1.6 + Math.random() * 3.2 * power,
+          Math.sin(ang) * (0.7 + Math.random() * 1.6)
+        );
         p.spin = (Math.random() - 0.5) * 12;
+        p.rot = 0;
         p.life = 0;
         p.max = 0.4 + Math.random() * 0.42;
+        colorAttr.setXYZ(idx, _c.r, _c.g, _c.b);
       }
+      colorAttr.needsUpdate = true;
     }
 
     function shockwave(x, z, color, power = 1) {
@@ -3121,18 +3513,31 @@ const VFX = (() => {
     }
 
     function update(dt, camera) {
-      for (const p of sparks) {
-        if (!p.mesh.visible) continue;
+      if (camera) _q.copy(camera.quaternion);
+      let any = false;
+      for (let i = 0; i < MAX_SPARKS; i++) {
+        const p = sparks[i];
+        if (!p.alive) { sparkMesh.setMatrixAt(i, _hidden); continue; }
         p.life += dt;
-        if (p.life >= p.max) { p.mesh.visible = false; continue; }
+        if (p.life >= p.max) {
+          p.alive = false;
+          sparkMesh.setMatrixAt(i, _hidden);
+          any = true;
+          continue;
+        }
         const k = p.life / p.max;
-        p.mesh.position.addScaledVector(p.vel, dt);
+        p.pos.addScaledVector(p.vel, dt);
         p.vel.y -= 9 * dt;
-        p.mesh.material.opacity = (1 - k) * (1 - k);
-        p.mesh.scale.setScalar(1 - k * 0.55);
-        p.mesh.rotation.z += p.spin * dt;
-        if (camera) p.mesh.quaternion.copy(camera.quaternion);
+        p.rot += p.spin * dt;
+        // fade by shrinking, since one shared material can't hold per-instance alpha
+        const sc = (1 - k) * (1 - k) * 1.4;
+        _s.set(sc, sc, sc);
+        _m.compose(p.pos, _q, _s);
+        sparkMesh.setMatrixAt(i, _m);
+        any = true;
       }
+      if (any) sparkMesh.instanceMatrix.needsUpdate = true;
+
       for (const r of rings) {
         if (!r.mesh.visible) continue;
         r.life += dt;
@@ -3144,14 +3549,19 @@ const VFX = (() => {
     }
 
     function clear() {
-      for (const p of sparks) p.mesh.visible = false;
+      for (let i = 0; i < MAX_SPARKS; i++) {
+        sparks[i].alive = false;
+        sparkMesh.setMatrixAt(i, _hidden);
+      }
+      sparkMesh.instanceMatrix.needsUpdate = true;
       for (const r of rings) r.mesh.visible = false;
     }
 
+    clear();
     return { burst, shockwave, update, clear, setBudget };
   }
 
-  return { Ambient, createPools };
+  return { Ambient, Textures, createPools };
 })();
 
 </script>
@@ -3187,11 +3597,11 @@ const Game = (() => {
 
   let renderer, scene, camera, clock, pools;
   let receptors = [], laneMats = [], echoMat, hiddenMat, holdMats = [];
-  let spectrumBars = [], highway, highwayGrid, sideWalls = [];
+  let spectrumBars = [], highway, highwayGrid, gridTex = null, sideWalls = [];
   let notePool = [], noteCursor = 0;
   let ghostMarkers = [];
 
-  let quality = "auto", tier = "medium";
+  let quality = "auto", tier = "medium", renderScale = 0;   // 0 = follow tier
   let fpsBuf = [], animId = null;
   let laneCount = 4;
 
@@ -3214,34 +3624,30 @@ const Game = (() => {
     camera.position.set(0, camBaseY, camBaseZ);
     camera.lookAt(0, 0.2, -6);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-    const key = new THREE.PointLight(0x7c5cff, 1.6, 26);
-    key.position.set(0, 5, 3);
-    scene.add(key);
-    const rim = new THREE.PointLight(0x5cf0ff, 1.1, 30);
-    rim.position.set(0, 2, -14);
-    scene.add(rim);
-    scene.userData.key = key; scene.userData.rim = rim;
+    // No lights: every material is unlit, which removes all per-pixel
+    // lighting work. The "beat pulse" is done by scaling colours instead.
 
     highway = new THREE.Mesh(
       new THREE.PlaneGeometry(4.2, 40),
-      new THREE.MeshStandardMaterial({ color: 0x0d0c20, roughness: 0.82, metalness: 0.15 })
+      new THREE.MeshBasicMaterial({ color: 0x0d0c20 })
     );
     highway.rotation.x = -Math.PI / 2;
     highway.position.z = -12;
     scene.add(highway);
 
-    // moving grid lines give speed a readable texture
-    highwayGrid = new THREE.Group();
-    for (let i = 0; i < 26; i++) {
-      const bar = new THREE.Mesh(
-        new THREE.PlaneGeometry(4.2, 0.022),
-        new THREE.MeshBasicMaterial({ color: 0x3b3670, transparent: true, opacity: 0.5 })
-      );
-      bar.rotation.x = -Math.PI / 2;
-      bar.position.z = -i * 1.6;
-      highwayGrid.add(bar);
-    }
+    // Speed lines used to be 26 separate meshes; now it's one plane with a
+    // repeating texture scrolled by UV offset — same look, 1 draw call.
+    gridTex = VFX.Textures.gridTexture(THREE);
+    gridTex.repeat.set(1, 25);
+    highwayGrid = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.2, 40),
+      new THREE.MeshBasicMaterial({
+        map: gridTex, color: 0x4a44880, transparent: true, opacity: 0.42, depthWrite: false,
+      })
+    );
+    highwayGrid.material.color.setHex(0x4a4488);
+    highwayGrid.rotation.x = -Math.PI / 2;
+    highwayGrid.position.set(0, 0.014, -12);
     scene.add(highwayGrid);
 
     // side walls — cheap depth cue that reads as a corridor
@@ -3285,27 +3691,30 @@ const Game = (() => {
       div.position.set(-2 + lw * i, 0.012, -12);
       scene.add(div);
 
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0x7c5cff, emissive: 0x7c5cff, emissiveIntensity: 0.55, roughness: 0.35,
-      });
+      const tileTex = VFX.Textures.tileTexture(THREE);
+      const mat = new THREE.MeshBasicMaterial({ map: tileTex, color: 0x7c5cff });
+      mat.userData.base = 0x7c5cff;
       laneMats.push(mat);
-      holdMats.push(new THREE.MeshStandardMaterial({
-        color: 0x7c5cff, emissive: 0x7c5cff, emissiveIntensity: 0.35,
-        transparent: true, opacity: 0.55, roughness: 0.4,
-      }));
+      const hold = new THREE.MeshBasicMaterial({
+        map: tileTex, color: 0x7c5cff, transparent: true, opacity: 0.6,
+      });
+      hold.userData.base = 0x7c5cff;
+      holdMats.push(hold);
 
-      const rec = new THREE.Mesh(new THREE.BoxGeometry(lw * 0.86, 0.055, 0.42), mat.clone());
+      const recMat = new THREE.MeshBasicMaterial({ map: tileTex, color: 0x7c5cff });
+      recMat.userData.base = 0x7c5cff;
+      const rec = new THREE.Mesh(new THREE.BoxGeometry(lw * 0.86, 0.055, 0.42), recMat);
       rec.position.set(x, 0.05, 2.2);
       scene.add(rec);
       receptors.push(rec);
     }
-    echoMat = new THREE.MeshStandardMaterial({
-      color: 0xc08bff, emissive: 0xc08bff, emissiveIntensity: 0.9, roughness: 0.3,
+    const tileTex = VFX.Textures.tileTexture(THREE);
+    echoMat = new THREE.MeshBasicMaterial({ map: tileTex, color: 0xc08bff });
+    echoMat.userData.base = 0xc08bff;
+    hiddenMat = new THREE.MeshBasicMaterial({
+      map: tileTex, color: 0x2a2550, transparent: true, opacity: 0.16,
     });
-    hiddenMat = new THREE.MeshStandardMaterial({
-      color: 0x2a2550, emissive: 0x120f28, emissiveIntensity: 0.1,
-      transparent: true, opacity: 0.16, roughness: 0.6,
-    });
+    hiddenMat.userData.base = 0x2a2550;
   }
 
   function buildSpectrum(count) {
@@ -3314,10 +3723,9 @@ const Game = (() => {
     for (let i = 0; i < count; i++) {
       const side = i < count / 2 ? -1 : 1;
       const idx = i % (count / 2);
-      const bar = new THREE.Mesh(
-        new THREE.BoxGeometry(0.17, 1, 0.17),
-        new THREE.MeshStandardMaterial({ color: 0x7c5cff, emissive: 0x7c5cff, emissiveIntensity: 0.5 })
-      );
+      const barMat = new THREE.MeshBasicMaterial({ color: 0x7c5cff });
+      barMat.userData.base = 0x7c5cff;
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.17, 1, 0.17), barMat);
       bar.position.set(side * (3.5 + (idx % 3) * 0.55), 0, 0.4 - idx * 1.7);
       bar.scale.y = 0.1;
       scene.add(bar);
@@ -3348,7 +3756,7 @@ const Game = (() => {
 
     // the ambient glow that breathes on the beat, sitting behind the track
     backGlow = new THREE.Mesh(
-      new THREE.PlaneGeometry(46, 26),
+      new THREE.PlaneGeometry(34, 18),
       new THREE.MeshBasicMaterial({
         color: 0x7c5cff, transparent: true, opacity: 0.1,
         blending: THREE.AdditiveBlending, depthWrite: false,
@@ -3429,9 +3837,7 @@ const Game = (() => {
     const g = new THREE.Group();
     const ball = new THREE.Mesh(
       new THREE.SphereGeometry(0.27, 20, 14),
-      new THREE.MeshStandardMaterial({
-        color: 0xffffff, emissive: 0x7c5cff, emissiveIntensity: 1.8, roughness: 0.18, metalness: 0.1,
-      })
+      (() => { const m = new THREE.MeshBasicMaterial({ color: 0xbfa8ff }); m.userData.base = 0xbfa8ff; return m; })()
     );
     g.add(ball);
     const halo = new THREE.Mesh(
@@ -3482,7 +3888,7 @@ const Game = (() => {
     hopper.ball.scale.set(1 + sq * 0.4 + arc * 0.1, 1 - sq * 0.35 + arc * 0.18, 1 + sq * 0.4);
     hopper.halo.scale.setScalar(1 + arc * 0.5);
     hopper.halo.material.opacity = 0.24 - arc * 0.14;
-    hopper.ball.material.emissiveIntensity = 1.8 + (lastFlowState ? 1.4 : 0) + sq * 1.6;
+    setGlow(hopper.ball.material, 0.85 + (lastFlowState ? 0.5 : 0) + sq * 0.6);
   }
 
   // Each pooled note is a small rig: the beveled body, an additive rim
@@ -3542,8 +3948,11 @@ const Game = (() => {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     updateCameraBase();
-    const dpr = tier === "low" ? 1 : tier === "medium" ? Math.min(1.4, devicePixelRatio || 1) : Math.min(2, devicePixelRatio || 1);
-    renderer.setPixelRatio(dpr);
+    // Pixel count dominates cost on integrated GPUs, so low tier renders
+    // *below* native and lets the browser upscale. Users can override.
+    const auto = tier === "low" ? 0.65 : tier === "medium" ? 0.9 : Math.min(1.35, devicePixelRatio || 1);
+    const scale = renderScale > 0 ? renderScale : auto;
+    renderer.setPixelRatio(Math.max(0.4, Math.min(2, scale)));
   }
 
   // A tall portrait phone needs a higher, wider camera or the highway
@@ -3569,11 +3978,15 @@ const Game = (() => {
     if (q !== "auto") applyTier(q);
   }
 
+  function setRenderScale(v) { renderScale = v; onResize(); }
+
+  function setRenderScale(v) { renderScale = v; onResize(); }
+
   function applyTier(t) {
     if (tier === t) return;
     tier = t;
     scene.fog.far = t === "low" ? 17 : t === "medium" ? 22 : 28;
-    highwayGrid.visible = t !== "low";
+    highwayGrid.visible = t === "high";
     sideWalls.forEach((w) => (w.visible = t === "high"));
     const bars = t === "low" ? 0 : t === "medium" ? 16 : 24;
     if (spectrumBars.length !== bars) buildSpectrum(bars);
@@ -3588,7 +4001,7 @@ const Game = (() => {
     }
     parallax.forEach((r) => (r.visible = t === "high"));
     streaks.forEach((s) => (s.visible = t !== "low"));
-    if (backGlow) backGlow.visible = true;
+    if (backGlow) backGlow.visible = t !== "low";
     noteDetail = t === "low" ? 0 : t === "medium" ? 1 : 2;
     onResize();
     const el = document.getElementById("tier-readout");
@@ -3616,25 +4029,25 @@ const Game = (() => {
     receptors.forEach((r, i) => {
       const hex = paletteHex[i % paletteHex.length];
       r.material.color.setHex(hex);
-      r.material.emissive.setHex(hex);
+      r.material.userData.base = hex;
     });
     laneMats.forEach((m, i) => {
       const hex = paletteHex[i % paletteHex.length];
-      m.color.setHex(hex); m.emissive.setHex(hex);
-      holdMats[i].color.setHex(hex); holdMats[i].emissive.setHex(hex);
+      m.color.setHex(hex); m.userData.base = hex;
+      holdMats[i].color.setHex(hex); holdMats[i].userData.base = hex;
     });
     spectrumBars.forEach((b, i) => {
       const hex = paletteHex[i % paletteHex.length];
-      b.material.color.setHex(hex); b.material.emissive.setHex(hex);
+      b.material.color.setHex(hex); b.material.userData.base = hex;
     });
-    scene.userData.key.color.setHex(paletteHex[0]);
-    scene.userData.rim.color.setHex(paletteHex[2]);
+
     if (backGlow) backGlow.material.color.setHex(paletteHex[0]);
     if (starField) starField.material.color.setHex(paletteHex[2]);
     parallax.forEach((r, i) => r.material.color.setHex(paletteHex[(i + 1) % paletteHex.length]));
     streaks.forEach((s2) => s2.material.color.setHex(paletteHex[2]));
     if (hopper) {
-      hopper.ball.material.emissive.setHex(paletteHex[0]);
+      hopper.ball.material.userData.base = paletteHex[0];
+      setGlow(hopper.ball.material, 0.9);
       hopper.halo.material.color.setHex(paletteHex[0]);
     }
   }
@@ -3767,7 +4180,8 @@ const Game = (() => {
       hopper.fromX = hopper.toX = laneX(hopper.lane);
       hopper.group.position.set(hopper.toX, 0.26, rz);
       hopper.t = 1; hopper.fell = 0; hopper.squash = 0;
-      hopper.ball.material.emissive.setHex(paletteHex[0]);
+      hopper.ball.material.userData.base = paletteHex[0];
+      setGlow(hopper.ball.material, 0.9);
       hopper.halo.material.color.setHex(paletteHex[0]);
     }
     // Rewind puts the hit line at the far end, so sit the camera much
@@ -4094,10 +4508,10 @@ const Game = (() => {
   }
 
   function applyFlowState(on) {
-    receptors.forEach((r) => (r.material.emissiveIntensity = on ? 1.5 : 0.55));
+    receptors.forEach((r) => setGlow(r.material, on ? 1.35 : 0.9));
     scene.fog.color.setHex(on ? 0x150c2e : 0x05040e);
     renderer.setClearColor(on ? 0x120a26 : 0x05040e, 1);
-    scene.userData.key.intensity = on ? 2.6 : 1.6;
+
     AudioEngine.setLayerGain("pad", on ? 0.55 : 0.32);
     AudioEngine.setLayerGain("lead", on ? 0.62 : 0.5);
     if (on) {
@@ -4166,6 +4580,17 @@ const Game = (() => {
     const map = { shake: "opt-shake", particles: "opt-particles", trails: "opt-trails", echo: "opt-echo" };
     const el = document.getElementById(map[name]);
     return el ? el.checked : true;
+  }
+
+  // With unlit materials there is no emissive channel, so "glow" means
+  // scaling the material's base colour. Cheaper, and looks the same on a
+  // dark track.
+  const _glowC = new THREE.Color();
+  function setGlow(mat, intensity) {
+    const base = mat.userData.base;
+    if (base === undefined) return;
+    _glowC.setHex(base).multiplyScalar(Math.max(0.15, intensity));
+    mat.color.copy(_glowC);
   }
 
   function laneX(lane) {
@@ -4281,22 +4706,21 @@ const Game = (() => {
       if (r.userData.flash > 0) {
         r.userData.flash -= dt;
         r.scale.y = 2.4;
-        r.material.emissiveIntensity = 2.2;
+        setGlow(r.material, 1.7);
       } else {
         r.scale.y += (1 - r.scale.y) * Math.min(1, dt * 14);
-        const target = lastFlowState ? 1.5 : 0.55;
-        r.material.emissiveIntensity += (target - r.material.emissiveIntensity) * Math.min(1, dt * 8);
+        const target = lastFlowState ? 1.35 : 0.9;
+        setGlow(r.material, target);
       }
     });
 
     // scrolling grid + beat pulse
-    if (highwayGrid.visible) {
-      const scroll = (nowBeat * UNITS_PER_BEAT * dir) % 1.6;
-      highwayGrid.position.z = scroll;
+    if (highwayGrid.visible && gridTex) {
+      gridTex.offset.y = (-nowBeat * dir * 0.55) % 1;
     }
     const beatPhase = nowBeat - Math.floor(nowBeat);
     const pulse = Math.pow(1 - beatPhase, 3);
-    scene.userData.key.intensity = (lastFlowState ? 2.6 : 1.6) + pulse * 1.1;
+
 
     // spectrum bars driven by the actual output
     if (spectrumBars.length) {
@@ -4316,7 +4740,7 @@ const Game = (() => {
         const target = 0.1 + v * 2.3;
         bar.scale.y += (target - bar.scale.y) * Math.min(1, dt * 16);
         bar.position.y = bar.scale.y / 2;
-        bar.material.emissiveIntensity = 0.3 + v * 1.1;
+        setGlow(bar.material, 0.45 + v * 0.9);
       });
     }
 
@@ -4411,11 +4835,13 @@ const Game = (() => {
   function forceFinish() { if (run && !run.ended) { run.flags.generative = false; finish(); } }
 
   return {
-    init, setQualityPref, startRun, togglePause, quit, forceFinish,
+    init, setQualityPref, setRenderScale, startRun, togglePause, quit, forceFinish,
     setOnFinish: (fn) => { onFinish = fn; },
     setOnChainAdvance: (fn) => { onChainAdvance = fn; },
     applyPalette, isEndless: endless,
     getRun: () => run,
+    // draw-call / triangle counts, for the perf readout and for tuning
+    stats: () => (renderer ? { ...renderer.info.render, programs: renderer.info.programs ? renderer.info.programs.length : 0 } : null),
   };
 })();
 
@@ -4468,11 +4894,19 @@ const Game = (() => {
 
     document.querySelectorAll(".choice-card").forEach((c) => {
       c.addEventListener("click", () => {
+        // First real gesture of the session: release the audio context here
+        // so it's long since running by the time a song needs to schedule.
+        try { AudioEngine.unlock(); } catch (e) { console.warn(e); }
         setPlatform(c.dataset.platform);
         renderMenu();
         go("screen-menu");
       });
     });
+
+    // Any later tap also counts, in case the first one was swallowed.
+    const nudge = () => { try { AudioEngine.unlock(); } catch (e) {} };
+    addEventListener("pointerdown", nudge, { capture: true });
+    addEventListener("keydown", nudge, { capture: true });
 
     setPlatform(saved || guessed);
   }
@@ -4748,43 +5182,177 @@ const Game = (() => {
   }
 
   /* ---------------- library ---------------- */
+  let libFilter = "all";       // all | title | artist
+  let libTracks = [];
+  let selectedId = null;
+
   async function refreshLibrary(query) {
-    const all = await Library.getAll();
+    let all = [];
+    try { all = await Library.getAll(); } catch (e) { console.warn(e); }
+    libTracks = all;
     libraryCount = all.length;
-    const shown = query ? Library.search(all, query) : all;
-    renderLibrary(shown, all.length);
+    renderLibrary(query !== undefined ? query : $("library-search").value);
   }
 
-  function renderLibrary(tracks, totalCount) {
-    const list = $("library-list");
-    $("library-empty").classList.toggle("hidden", totalCount > 0);
-    list.innerHTML = "";
-    tracks.forEach((t, i) => {
-      const row = document.createElement("div");
-      row.className = "track-row";
-      row.style.animationDelay = Math.min(i, 12) * 0.03 + "s";
-      row.style.setProperty("--row-accent", t.palette.primary);
-      row.innerHTML = `
-        <img class="track-art" src="${t.artDataUrl}" alt="" />
-        <div class="track-meta">
-          <div class="track-title">${esc(t.title)}</div>
-          <div class="track-artist">${esc(t.artist)}</div>
-          <div class="track-tags">
-            ${t.lyricsText ? '<span class="track-tag">LYRICS</span>' : ""}
-            ${t.generatedArt ? '<span class="track-tag">GEN COVER</span>' : '<span class="track-tag">COVER</span>'}
-          </div>
+  function matches(t, q) {
+    if (!q) return true;
+    const needle = q.trim().toLowerCase();
+    if (!needle) return true;
+    const title = (t.title || "").toLowerCase();
+    const artist = (t.artist || "").toLowerCase();
+    const album = (t.album || "").toLowerCase();
+    if (libFilter === "title") return title.includes(needle);
+    if (libFilter === "artist") return artist.includes(needle);
+    return title.includes(needle) || artist.includes(needle) || album.includes(needle);
+  }
+
+  function renderLibrary(query) {
+    const grid = $("library-grid");
+    const empty = $("library-empty");
+    empty.classList.toggle("hidden", libTracks.length > 0);
+    grid.innerHTML = "";
+
+    const shown = libTracks.filter((t) => matches(t, query));
+
+    // "Artists" groups the shelf by artist, like a real library view
+    let items = [];
+    if (libFilter === "artist") {
+      const byArtist = new Map();
+      for (const t of shown) {
+        const key = t.artist || "Unknown Artist";
+        if (!byArtist.has(key)) byArtist.set(key, []);
+        byArtist.get(key).push(t);
+      }
+      [...byArtist.keys()].sort((a, b) => a.localeCompare(b)).forEach((artist) => {
+        items.push({ group: artist, count: byArtist.get(artist).length });
+        items.push(...byArtist.get(artist));
+      });
+    } else {
+      items = shown;
+    }
+
+    items.forEach((t, i) => {
+      if (t.group) {
+        const h = document.createElement("div");
+        h.className = "bp-group";
+        h.textContent = `${t.group} · ${t.count} song${t.count === 1 ? "" : "s"}`;
+        grid.appendChild(h);
+        return;
+      }
+      const tile = document.createElement("button");
+      tile.className = "bp-tile" + (t.id === selectedId ? " selected" : "");
+      tile.style.animationDelay = Math.min(i, 14) * 0.025 + "s";
+      tile.innerHTML = `
+        <div class="bp-cover">
+          ${t.lyricsText ? '<span class="bp-badge">LYRICS</span>' : ""}
+          <img src="${t.artDataUrl}" alt="" loading="lazy" />
         </div>
-        <button class="track-del" aria-label="Delete">✕</button>`;
-      row.addEventListener("click", (e) => {
-        if (e.target.closest(".track-del")) return;
-        playTrack(t);
+        <span class="bp-name">${esc(t.title)}</span>
+        <span class="bp-sub">${esc(t.artist)}</span>`;
+      // first click focuses it in the hero, second click plays — so you can
+      // browse covers without committing to a run
+      tile.addEventListener("click", () => {
+        if (selectedId === t.id) playTrack(t);
+        else { selectedId = t.id; showHero(t); renderLibrary(query); }
       });
-      row.querySelector(".track-del").addEventListener("click", async (e) => {
-        e.stopPropagation();
-        await Library.remove(t.id);
-        refreshLibrary($("library-search").value);
-      });
-      list.appendChild(row);
+      tile.addEventListener("dblclick", () => playTrack(t));
+      grid.appendChild(tile);
+    });
+
+    $("lib-count").textContent = libTracks.length
+      ? `${shown.length} of ${libTracks.length} song${libTracks.length === 1 ? "" : "s"}` +
+        (query ? ` matching "${query}"` : "")
+      : "";
+
+    const sel = libTracks.find((t) => t.id === selectedId);
+    if (sel && shown.includes(sel)) showHero(sel);
+    else if (shown.length) { selectedId = shown[0].id; showHero(shown[0]); }
+    else { selectedId = null; $("lib-hero").classList.add("hidden"); }
+  }
+
+  function showHero(t) {
+    const hero = $("lib-hero");
+    hero.classList.remove("hidden");
+    $("hero-art").src = t.artDataUrl;
+    $("hero-title").textContent = t.title;
+    $("hero-artist").textContent = t.artist;
+    $("hero-album").textContent = t.album || "";
+    hero.style.setProperty("--hero-glow", t.palette.primary);
+
+    const best = Persist.getBest("library", t.id);
+    const meta = [];
+    if (best) meta.push(`BEST ${best.score.toLocaleString()} · ${best.grade}`);
+    meta.push(t.lyricsText ? "LYRICS" : "NO LYRICS");
+    meta.push(t.embeddedArt ? "EMBEDDED ART" : t.generatedArt ? "GENERATED ART" : "COVER");
+    $("hero-meta").innerHTML = meta.map((m) => `<span>${esc(m)}</span>`).join("");
+
+    $("hero-play").onclick = () => playTrack(t);
+    $("hero-lyrics").onclick = () => openLyricsEditor(t);
+    $("hero-delete").onclick = async () => {
+      await Library.remove(t.id);
+      selectedId = null;
+      await refreshLibrary();
+      renderMenu();
+    };
+  }
+
+  /* ---------------- lyrics without uploading a file ---------------- */
+  let lyricsTarget = null;
+
+  function openLyricsEditor(t) {
+    lyricsTarget = t;
+    $("lyr-song").textContent = t.title;
+    $("lyr-text").value = t.lyricsText || "";
+    $("lyr-status").textContent = "";
+    $("lyr-status").className = "lyr-status";
+    $("modal-lyrics").classList.remove("hidden");
+  }
+
+  async function fetchLyrics() {
+    if (!lyricsTarget) return;
+    const status = $("lyr-status");
+    status.className = "lyr-status";
+    status.textContent = "Searching LRCLIB…";
+    const t = lyricsTarget;
+    try {
+      // LRCLIB is a free, open, key-less lyrics database with CORS enabled.
+      const url = "https://lrclib.net/api/search?track_name=" +
+        encodeURIComponent(t.title) + "&artist_name=" + encodeURIComponent(t.artist || "");
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const list = await res.json();
+      if (!Array.isArray(list) || !list.length) {
+        status.className = "lyr-status bad";
+        status.textContent = "No match found — paste lyrics below instead.";
+        return;
+      }
+      const hit = list.find((x) => x.syncedLyrics) || list[0];
+      const text = hit.syncedLyrics || hit.plainLyrics || "";
+      if (!text) {
+        status.className = "lyr-status bad";
+        status.textContent = "Found the song but it has no lyrics stored.";
+        return;
+      }
+      $("lyr-text").value = text;
+      status.className = "lyr-status ok";
+      status.textContent = (hit.syncedLyrics ? "Synced" : "Plain") +
+        " lyrics found: " + (hit.trackName || t.title) + " — " + (hit.artistName || "");
+    } catch (err) {
+      status.className = "lyr-status bad";
+      status.textContent = "Couldn't reach LRCLIB (offline, or blocked). Paste lyrics below.";
+    }
+  }
+
+  function wireLyricsEditor() {
+    $("lyr-fetch").addEventListener("click", fetchLyrics);
+    $("lyr-cancel").addEventListener("click", () => $("modal-lyrics").classList.add("hidden"));
+    $("lyr-clear").addEventListener("click", () => { $("lyr-text").value = ""; });
+    $("lyr-save").addEventListener("click", async () => {
+      if (!lyricsTarget) return;
+      const text = $("lyr-text").value.trim();
+      await Library.updateTrack(lyricsTarget.id, { lyricsText: text || null });
+      $("modal-lyrics").classList.add("hidden");
+      await refreshLibrary();
     });
   }
 
@@ -4893,7 +5461,7 @@ const Game = (() => {
       return;
     }
 
-    await refreshLibrary($("library-search").value);
+    await refreshLibrary();
     renderMenu();
 
     if (!result.total) {
@@ -4947,7 +5515,19 @@ const Game = (() => {
 
     $("error-close").addEventListener("click", () => $("error-toast").classList.add("hidden"));
 
-    $("library-search").addEventListener("input", (e) => refreshLibrary(e.target.value));
+    $("library-search").addEventListener("input", (e) => renderLibrary(e.target.value));
+
+    $("filter-chips").addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      libFilter = chip.dataset.filter;
+      document.querySelectorAll("#filter-chips .chip").forEach((c) => c.classList.toggle("active", c === chip));
+      const ph = { all: "Search your music…", title: "Search song titles…", artist: "Search artists…" };
+      $("library-search").placeholder = ph[libFilter];
+      renderLibrary($("library-search").value);
+    });
+
+    wireLyricsEditor();
 
     $("btn-add-track").addEventListener("click", () => $("file-batch").click());
   }
@@ -5071,6 +5651,38 @@ const Game = (() => {
       el.checked = Persist.getSetting(k, true);
       el.addEventListener("change", () => Persist.setSetting(k, el.checked));
     });
+
+    const res = $("opt-render");
+    res.value = Persist.getSetting("renderScale", 0);
+    const showRes = () => { $("res-val").textContent = +res.value === 0 ? "Auto" : res.value + "%"; };
+    showRes();
+    Game.setRenderScale(+res.value / 100);
+    res.addEventListener("input", () => {
+      showRes();
+      Game.setRenderScale(+res.value / 100);
+      Persist.setSetting("renderScale", +res.value);
+    });
+
+    const vol = $("opt-volume");
+    vol.value = Persist.getSetting("volume", 85);
+    $("vol-val").textContent = vol.value + "%";
+    AudioEngine.setMasterVolume(vol.value / 100);
+    vol.addEventListener("input", () => {
+      $("vol-val").textContent = vol.value + "%";
+      AudioEngine.setMasterVolume(vol.value / 100);
+      Persist.setSetting("volume", +vol.value);
+    });
+
+    // If the browser is still holding audio hostage, say so and offer a fix
+    // rather than letting the player think the game just has no music.
+    const blockedBtn = $("audio-blocked");
+    blockedBtn.addEventListener("click", async () => {
+      await AudioEngine.unlock();
+      if (!AudioEngine.audioBlocked()) blockedBtn.classList.add("hidden");
+    });
+    setInterval(() => {
+      blockedBtn.classList.toggle("hidden", !AudioEngine.audioBlocked());
+    }, 1000);
 
     const off = $("opt-offset");
     off.value = Persist.getSetting("offset", 0);

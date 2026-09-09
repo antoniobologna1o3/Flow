@@ -48,9 +48,35 @@ const AudioEngine = (() => {
     for (const seg of segs) { if (seg.time <= time) s = seg; else break; }
     return s.beat + (time - s.time) / (60 / s.bpm);
   }
+  // Gameplay clock. Normally this is the audio clock, but a suspended or
+  // stalled AudioContext freezes currentTime — which used to freeze every
+  // note on screen. Fall back to the wall clock so the game keeps running,
+  // and re-anchor the timeline when audio comes back so the beat doesn't
+  // jump.
+  let anchorAudio = 0, anchorWall = 0, usingFallback = false;
+  function audioNow() {
+    const wall = performance.now() / 1000;
+    if (ctx && ctx.state === "running") {
+      if (usingFallback) {
+        // Audio just came back: rebase the timeline onto the real clock at
+        // whatever beat the fallback had reached.
+        const beatNow = timeToBeat(anchorAudio + (wall - anchorWall) + offsetMs / 1000);
+        const bpm = segFor(beatNow).bpm;
+        segs = [{ beat: beatNow, time: ctx.currentTime, bpm }];
+        usingFallback = false;
+      }
+      anchorAudio = ctx.currentTime;
+      anchorWall = wall;
+      return ctx.currentTime;
+    }
+    if (!ctx) return 0;
+    usingFallback = true;
+    return anchorAudio + (wall - anchorWall);
+  }
+
   function currentBeat() {
     if (!ctx) return 0;
-    return timeToBeat(ctx.currentTime + offsetMs / 1000);
+    return timeToBeat(audioNow() + offsetMs / 1000);
   }
   function currentBpm() { return segFor(currentBeat()).bpm; }
 
@@ -80,9 +106,9 @@ const AudioEngine = (() => {
       delaySend = ctx.createGain(); delaySend.gain.value = 0.2;
       delayNode.connect(delayFB); delayFB.connect(delayNode);
 
-      for (const name of ["drums", "bass", "pad", "lead"]) {
+      for (const name of ["drums", "bass", "pad", "arp", "lead"]) {
         const g = ctx.createGain();
-        g.gain.value = { drums: 0.9, bass: 0.75, pad: 0.32, lead: 0.5 }[name];
+        g.gain.value = { drums: 0.9, bass: 0.75, pad: 0.34, arp: 0.42, lead: 0.55 }[name];
         g.connect(musicBus);
         bus[name] = g;
       }
@@ -95,8 +121,45 @@ const AudioEngine = (() => {
       analyser.connect(master);
       master.connect(ctx.destination);
     }
-    if (ctx.state === "suspended") ctx.resume();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
     return ctx;
+  }
+
+  // Browsers hand back a *suspended* AudioContext until a real user
+  // gesture releases it, and a suspended context's currentTime does not
+  // advance. Anchoring a song's timeline to that frozen clock made every
+  // scheduled note look like it was already in the past, so the backing
+  // track was silently dropped while the beat clock ran on. Unlock on the
+  // very first tap, and never start a song until the clock is truly live.
+  function unlock() {
+    ensureCtx();
+    if (ctx.state === "running") return Promise.resolve(true);
+    return ctx.resume().then(() => ctx.state === "running").catch(() => false);
+  }
+
+  function whenRunning(fn) {
+    ensureCtx();
+    if (ctx.state === "running") { fn(); return; }
+    let done = false;
+    const go = () => { if (!done && ctx.state === "running") { done = true; cleanup(); fn(); } };
+    const cleanup = () => {
+      clearInterval(poll);
+      ctx.removeEventListener?.("statechange", go);
+    };
+    ctx.addEventListener?.("statechange", go);
+    ctx.resume().then(go).catch(() => {});
+    const poll = setInterval(() => {
+      go();
+      if (done) clearInterval(poll);
+    }, 120);
+    // Give up waiting after a few seconds so we never hang forever.
+    setTimeout(() => { if (!done) { done = true; cleanup(); fn(); } }, 4000);
+  }
+
+  function audioBlocked() { return !!ctx && ctx.state !== "running"; }
+  function setMasterVolume(v) {
+    ensureCtx();
+    master.gain.setTargetAtTime(Math.max(0, Math.min(1.4, v)), ctx.currentTime, 0.02);
   }
 
   function makeImpulse(seconds, decay) {
@@ -194,6 +257,21 @@ const AudioEngine = (() => {
     }
   }
 
+  // Counter-melody pluck. Unlike the lead, this one IS scheduled: the
+  // arrangement has to be music on its own, or a player who misses
+  // everything hears almost nothing.
+  function arpNote(t, freq, dur, gain = 1) {
+    const o = ctx.createOscillator(), g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    o.type = "triangle";
+    o.frequency.value = freq;
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(Math.min(9000, freq * 7), t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(400, freq * 2), t + dur);
+    env(g, t, 0.3 * gain, 0.005, dur * 0.2, dur * 0.9);
+    o.connect(lp); lp.connect(g); g.connect(bus.arp);
+    o.start(t); o.stop(t + dur + 0.25);
+  }
+
   // Lead voice — normally fired live by a player hit, not by the scheduler.
   // quality: 'perfect' | 'great' | 'good' | 'dead'
   function leadNote(freq, quality = "perfect", opts = {}) {
@@ -229,14 +307,19 @@ const AudioEngine = (() => {
     stop();
     ensureCtx();
     mode = "synth";
-    song = { layers: { drums: [], bass: [], pad: [] }, ...newSong };
+    song = { layers: { drums: [], bass: [], pad: [], arp: [] }, ...newSong };
+    if (!song.layers.arp) song.layers.arp = [];
     onNeedBars = opts.onNeedBars || null;
     generatedTo = song.beats || 0;
-    cursor = { drums: 0, bass: 0, pad: 0 };
-    resetTimeline(ctx.currentTime + 0.35, song.bpm);
-    playing = true;
-    schedTimer = setInterval(tick, 25);
-    tick();
+    cursor = { drums: 0, bass: 0, pad: 0, arp: 0 };
+    // Don't anchor the timeline until the audio clock is genuinely running.
+    whenRunning(() => {
+      resetTimeline(ctx.currentTime + 0.35, song.bpm);
+      playing = true;
+      clearInterval(schedTimer);
+      schedTimer = setInterval(tick, 25);
+      tick();
+    });
   }
 
   function tick() {
@@ -244,7 +327,7 @@ const AudioEngine = (() => {
     const nowBeat = currentBeat();
     const horizon = nowBeat + 2.5;   // schedule ~2.5 beats ahead
 
-    for (const layer of ["drums", "bass", "pad"]) {
+    for (const layer of ["drums", "bass", "pad", "arp"]) {
       const list = song.layers[layer] || [];
       while (cursor[layer] < list.length && list[cursor[layer]].beat <= horizon) {
         const ev = list[cursor[layer]++];
@@ -256,6 +339,8 @@ const AudioEngine = (() => {
           else hat(t, ev.gain, ev.kind === "openhat");
         } else if (layer === "bass") {
           bassNote(t, ev.freq, ev.dur, ev.gain);
+        } else if (layer === "arp") {
+          arpNote(t, ev.freq, ev.dur, ev.gain);
         } else {
           padChord(t, ev.freqs, ev.dur, ev.gain);
         }
@@ -267,8 +352,11 @@ const AudioEngine = (() => {
       const bpmNow = currentBpm();
       const added = onNeedBars(generatedTo, bpmNow);
       if (added) {
-        for (const layer of ["drums", "bass", "pad"]) {
-          if (added.layers && added.layers[layer]) song.layers[layer].push(...added.layers[layer]);
+        for (const layer of ["drums", "bass", "pad", "arp"]) {
+          if (added.layers && added.layers[layer]) {
+            if (!song.layers[layer]) song.layers[layer] = [];
+            song.layers[layer].push(...added.layers[layer]);
+          }
         }
         generatedTo = added.untilBeat;
         if (added.bpm && Math.abs(added.bpm - bpmNow) > 0.5) pushTempo(added.startBeat, added.bpm);
@@ -293,15 +381,17 @@ const AudioEngine = (() => {
     stop();
     ensureCtx();
     mode = "buffer";
-    srcNode = ctx.createBufferSource();
-    srcNode.buffer = decoded;
-    srcNode.connect(musicBus);
-    bufOffset = offset;
-    bufStartCtx = ctx.currentTime + 0.08;
-    resetTimeline(bufStartCtx - offset, bpm);
-    srcNode.start(bufStartCtx, offset);
-    playing = true;
-    srcNode.onended = () => { if (mode === "buffer") playing = false; };
+    whenRunning(() => {
+      srcNode = ctx.createBufferSource();
+      srcNode.buffer = decoded;
+      srcNode.connect(musicBus);
+      bufOffset = offset;
+      bufStartCtx = ctx.currentTime + 0.08;
+      resetTimeline(bufStartCtx - offset, bpm);
+      srcNode.start(bufStartCtx, offset);
+      playing = true;
+      srcNode.onended = () => { if (mode === "buffer") playing = false; };
+    });
   }
 
   // Imported audio can't have its melody gated, so a miss ducks the mix.
@@ -348,7 +438,7 @@ const AudioEngine = (() => {
     if (mode === "synth" && song) {
       const bpm = segFor(pausedBeat).bpm;
       segs = [{ beat: pausedBeat, time: ctx.currentTime + 0.2, bpm }];
-      for (const layer of ["drums", "bass", "pad"]) {
+      for (const layer of ["drums", "bass", "pad", "arp"]) {
         const list = song.layers[layer] || [];
         cursor[layer] = list.findIndex((e) => e.beat >= pausedBeat);
         if (cursor[layer] < 0) cursor[layer] = list.length;
@@ -476,13 +566,16 @@ const AudioEngine = (() => {
   }
 
   return {
-    ensureCtx, playSong, playBuffer, loadFile, stop, pause, resume,
+    ensureCtx, unlock, audioBlocked, setMasterVolume,
+    playSong, playBuffer, loadFile, stop, pause, resume,
     leadNote, duck, setLayerGain, autoChart,
     currentBeat, beatToTime, timeToBeat, currentBpm, pushTempo,
     getLevel, getSpectrum, binCount: () => (analyser ? analyser.frequencyBinCount : 0),
     isPlaying: () => playing,
+    usingFallbackClock: () => usingFallback,
     setOffset: (ms) => { offsetMs = ms; },
     getOffset: () => offsetMs,
     getMode: () => mode,
+    getContext: () => ctx,
   };
 })();
