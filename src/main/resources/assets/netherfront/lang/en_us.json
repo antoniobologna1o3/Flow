@@ -1,0 +1,20 @@
+{
+  "key.categories.netherfront": "Netherfront",
+  "key.netherfront.open_map": "Open Strategic Map",
+
+  "netherfront.system.territory": "Territory",
+  "netherfront.system.intel": "Fog of War",
+  "netherfront.system.scouting": "Scouting",
+  "netherfront.system.supply": "Supply Lines",
+  "netherfront.system.villages": "Dynamic Villages",
+  "netherfront.system.relics": "Relics",
+  "netherfront.system.mercenaries": "Mercenaries",
+  "netherfront.system.objectives": "Dynamic Objectives",
+  "netherfront.system.events": "World Events",
+  "netherfront.system.bosses": "World Bosses",
+  "netherfront.system.spies": "Espionage",
+  "netherfront.system.weather": "Weather Effects",
+  "netherfront.system.caravans": "Caravans",
+  "netherfront.system.naval": "Naval",
+  "netherfront.system.domination": "Domination Scoring"
+}
