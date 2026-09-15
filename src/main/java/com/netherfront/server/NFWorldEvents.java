@@ -107,6 +107,11 @@ public final class NFWorldEvents {
             ctx.feedTeam(breakerTeam, FeedCategory.COMBAT,
                     Component.literal("Destroyed an enemy " + removed.kind().displayName() + "."),
                     event.getPos());
+            com.netherfront.common.objective.ObjectiveSystem objectives =
+                    data.sub(com.netherfront.common.objective.ObjectiveSystem.class);
+            if (objectives != null && data.match().settings().isEnabled(NFSystem.OBJECTIVES)) {
+                objectives.onEnemyStructureDestroyed(ctx, breakerTeam);
+            }
         }
     }
 
@@ -131,6 +136,17 @@ public final class NFWorldEvents {
 
         MinecraftServer server = level.getServer();
         NFSavedData data = NFSavedData.get(server);
+        String team = data.match().teamIdOf(killer.getUUID());
+        MatchContext ctx = new MatchContext(server, data, level.getGameTime(), RANDOM);
+
+        if (data.match().settings().isEnabled(NFSystem.BOSSES)) {
+            com.netherfront.common.boss.BossSystem bosses =
+                    data.sub(com.netherfront.common.boss.BossSystem.class);
+            if (bosses != null) {
+                bosses.onBossKilled(ctx, victim, team);
+            }
+        }
+
         if (!data.match().settings().isEnabled(NFSystem.VILLAGES)) {
             return;
         }
@@ -138,9 +154,6 @@ public final class NFWorldEvents {
         if (villages == null) {
             return;
         }
-
-        String team = data.match().teamIdOf(killer.getUUID());
-        MatchContext ctx = new MatchContext(server, data, level.getGameTime(), RANDOM);
 
         if (victim instanceof AbstractVillager) {
             villages.onVillagerKilled(ctx, level.dimension(), victim.blockPosition(), team);

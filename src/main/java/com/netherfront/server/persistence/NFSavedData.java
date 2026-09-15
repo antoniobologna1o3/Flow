@@ -48,6 +48,10 @@ public class NFSavedData extends SavedData {
         register(new com.netherfront.common.structure.StructureSystem());
         register(new com.netherfront.common.village.VillageSystem());
         register(new com.netherfront.common.relic.RelicSystem());
+        register(new com.netherfront.common.objective.ObjectiveSystem());
+        register(new com.netherfront.common.event.EventDirector());
+        register(new com.netherfront.common.boss.BossSystem());
+        register(new com.netherfront.common.mercenary.MercenarySystem());
         register(new com.netherfront.common.territory.TerritorySystem());
     }
 
