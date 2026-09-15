@@ -1,5 +1,7 @@
 # Netherfront: Dynamic Warfare
 
+[![Build](https://github.com/antoniobologna1o3/Flow/actions/workflows/build.yml/badge.svg)](https://github.com/antoniobologna1o3/Flow/actions/workflows/build.yml)
+
 A companion expansion for the [Reign of Nether](https://www.curseforge.com/minecraft/mc-mods/reign-of-nether-rts-in-minecraft)
 RTS mod for **Minecraft 1.20.1 (Forge)**.
 
@@ -43,12 +45,22 @@ the RTS integration disabled. Teams are then assigned manually.
 
 ### Building from source
 
+Build with **JDK 17**. Minecraft 1.20.1 targets Java 17 and ForgeGradle 6
+expects to run on it, so point `JAVA_HOME` at a 17 install rather than relying
+on a newer default JDK:
+
 ```bash
-./gradlew build      # jar lands in build/libs/
-./gradlew test       # pure-logic unit tests
+export JAVA_HOME=/path/to/jdk-17
+./gradlew build      # compiles, runs the tests, jar lands in build/libs/
+./gradlew test       # unit tests on their own
 ```
 
-Requires a JDK 17 toolchain.
+The first build downloads and decompiles Minecraft, so expect it to take several
+minutes. Later builds are much faster.
+
+CI runs the same `./gradlew build` on every push, and attaches the built jar to
+the run as an artifact — so you can download a playable build from the Actions
+tab without setting up a toolchain locally.
 
 ---
 
