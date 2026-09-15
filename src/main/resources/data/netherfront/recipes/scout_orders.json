@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "PPP", "PFP", "PPP" ],
+  "key": {
+    "P": { "item": "minecraft:paper" },
+    "F": { "item": "minecraft:feather" }
+  },
+  "result": { "item": "netherfront:scout_orders", "count": 2 }
+}

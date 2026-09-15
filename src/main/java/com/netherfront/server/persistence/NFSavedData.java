@@ -43,8 +43,12 @@ public class NFSavedData extends SavedData {
     }
 
     private void registerSubsystems() {
-        // Subsystems are registered here as they are introduced. Order matters
-        // only for tick dispatch, not for persistence.
+        // Order here is tick order. Structures resolve first because territory
+        // and supply are both derived from them.
+        register(new com.netherfront.common.structure.StructureSystem());
+        register(new com.netherfront.common.village.VillageSystem());
+        register(new com.netherfront.common.relic.RelicSystem());
+        register(new com.netherfront.common.territory.TerritorySystem());
     }
 
     protected void register(NFSubsystem subsystem) {

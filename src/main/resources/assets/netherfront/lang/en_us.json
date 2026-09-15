@@ -1,7 +1,6 @@
 {
   "key.categories.netherfront": "Netherfront",
   "key.netherfront.open_map": "Open Strategic Map",
-
   "netherfront.system.territory": "Territory",
   "netherfront.system.intel": "Fog of War",
   "netherfront.system.scouting": "Scouting",
@@ -16,5 +15,11 @@
   "netherfront.system.weather": "Weather Effects",
   "netherfront.system.caravans": "Caravans",
   "netherfront.system.naval": "Naval",
-  "netherfront.system.domination": "Domination Scoring"
+  "netherfront.system.domination": "Domination Scoring",
+  "itemGroup.netherfront": "Netherfront",
+  "block.netherfront.outpost_banner": "Forward Outpost",
+  "block.netherfront.supply_depot": "Supply Depot",
+  "block.netherfront.watchtower_core": "Watchtower",
+  "item.netherfront.scout_orders": "Scout Orders",
+  "item.netherfront.spy_orders": "Spy Orders"
 }

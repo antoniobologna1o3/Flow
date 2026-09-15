@@ -32,6 +32,10 @@ public class NetherfrontMod {
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, NFConfig.SERVER_SPEC);
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, NFConfig.CLIENT_SPEC);
 
+        com.netherfront.common.registry.NFBlocks.register(modBus);
+        com.netherfront.common.registry.NFItems.register(modBus);
+        com.netherfront.common.registry.NFCreativeTab.register(modBus);
+
         modBus.addListener(this::commonSetup);
 
         MinecraftForge.EVENT_BUS.register(com.netherfront.server.NFServerEvents.class);

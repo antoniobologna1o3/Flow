@@ -3,7 +3,6 @@ package com.netherfront.common.util;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.random.RandomGenerator;
 
 /**
  * Small weighted-random helper used by the event director, objective generator
@@ -36,11 +35,17 @@ public final class WeightedPicker<T> {
         return total;
     }
 
-    public Optional<T> pick(RandomGenerator random) {
+    /**
+     * Picks an entry using a uniform roll in [0, 1).
+     *
+     * <p>Takes the roll rather than a random source so this stays free of any
+     * Minecraft type and can be tested with fixed values.
+     */
+    public Optional<T> pick(double roll01) {
         if (entries.isEmpty()) {
             return Optional.empty();
         }
-        double roll = random.nextDouble() * total;
+        double roll = Math.max(0.0D, Math.min(1.0D, roll01)) * total;
         for (Entry<T> entry : entries) {
             roll -= entry.weight();
             if (roll <= 0.0D) {
