@@ -74,6 +74,7 @@ public final class NFWorldEvents {
                 .withStyle(ChatFormatting.AQUA));
 
         MatchContext ctx = new MatchContext(server, data, level.getGameTime(), RANDOM);
+        ctx.stat(team, com.netherfront.common.stats.StatKey.STRUCTURES_BUILT, 1);
         ctx.feedTeam(team, FeedCategory.SUPPLY,
                 Component.literal(kind.displayName() + " established."), pos);
     }
@@ -101,12 +102,14 @@ public final class NFWorldEvents {
 
         MatchContext ctx = new MatchContext(server, data, level.getGameTime(), RANDOM);
         String breakerTeam = data.match().teamIdOf(event.getPlayer().getUUID());
+        ctx.stat(removed.ownerTeamId(), com.netherfront.common.stats.StatKey.STRUCTURES_LOST, 1);
         ctx.feedTeam(removed.ownerTeamId(), FeedCategory.COMBAT,
                 Component.literal(removed.kind().displayName() + " destroyed."), event.getPos());
         if (!breakerTeam.equals(removed.ownerTeamId()) && !MatchTeam.NEUTRAL.equals(breakerTeam)) {
             ctx.feedTeam(breakerTeam, FeedCategory.COMBAT,
                     Component.literal("Destroyed an enemy " + removed.kind().displayName() + "."),
                     event.getPos());
+            ctx.stat(breakerTeam, com.netherfront.common.stats.StatKey.STRUCTURES_DESTROYED, 1);
             com.netherfront.common.objective.ObjectiveSystem objectives =
                     data.sub(com.netherfront.common.objective.ObjectiveSystem.class);
             if (objectives != null && data.match().settings().isEnabled(NFSystem.OBJECTIVES)) {
@@ -166,6 +169,27 @@ public final class NFWorldEvents {
         if (event.getSource().getEntity() instanceof Player player) {
             killer = player;
         }
+
+        // Player losses are recorded whether or not a player did the killing,
+        // so dying to the world still counts against you.
+        if (victim instanceof ServerPlayer victimPlayer) {
+            MinecraftServer victimServer = victimPlayer.getServer();
+            if (victimServer != null) {
+                NFSavedData victimData = NFSavedData.get(victimServer);
+                MatchContext victimCtx = new MatchContext(victimServer, victimData,
+                        level.getGameTime(), RANDOM);
+                String lostTeam = victimData.match().teamIdOf(victimPlayer.getUUID());
+                victimCtx.stat(lostTeam, com.netherfront.common.stats.StatKey.UNITS_LOST, 1);
+                if (killer != null) {
+                    String killerTeam = victimData.match().teamIdOf(killer.getUUID());
+                    if (victimData.match().isHostile(lostTeam, killerTeam)) {
+                        victimCtx.stat(killerTeam,
+                                com.netherfront.common.stats.StatKey.UNITS_DEFEATED, 1);
+                    }
+                }
+            }
+        }
+
         if (killer == null) {
             return;
         }

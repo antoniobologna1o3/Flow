@@ -334,6 +334,7 @@ public final class VillageSystem implements NFSubsystem, SnapshotContributor, In
                 Component.literal(village.name() + " is grateful. Reputation: "
                         + level.glyph() + " " + level.displayName()),
                 village.center());
+        ctx.stat(team, com.netherfront.common.stats.StatKey.VILLAGES_SUPPORTED, 1);
         ctx.markDirty();
     }
 

@@ -297,6 +297,7 @@ public final class BossSystem implements NFSubsystem, SnapshotContributor {
                 give(player, new ItemStack(Items.GOLD_INGOT, 8));
                 give(player, new ItemStack(Items.IRON_INGOT, 16));
             }
+            ctx.stat(killerTeam, com.netherfront.common.stats.StatKey.BOSSES_DEFEATED, 1);
             ObjectiveSystem objectives = ctx.sub(ObjectiveSystem.class);
             if (objectives != null) {
                 objectives.onWorldBossDefeated(ctx, killerTeam);

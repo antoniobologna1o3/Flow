@@ -233,6 +233,8 @@ public final class SpySystem implements NFSubsystem, SnapshotContributor {
             living.addEffect(new MobEffectInstance(MobEffects.GLOWING, 1200, 0, true, false));
         }
 
+        ctx.stat(detectingTeam, com.netherfront.common.stats.StatKey.ENEMY_SPIES_CAUGHT, 1);
+        ctx.stat(state.teamId(), com.netherfront.common.stats.StatKey.SPIES_DETECTED, 1);
         ctx.feedTeam(detectingTeam, FeedCategory.ESPIONAGE,
                 Component.literal("Enemy spy discovered."), entity.blockPosition());
         ctx.feedTeam(state.teamId(), FeedCategory.ESPIONAGE,
@@ -268,6 +270,7 @@ public final class SpySystem implements NFSubsystem, SnapshotContributor {
             return;
         }
         state.setReported(true);
+        ctx.stat(state.teamId(), com.netherfront.common.stats.StatKey.SPY_MISSIONS_COMPLETED, 1);
         ctx.feedTeam(state.teamId(), FeedCategory.ESPIONAGE,
                 Component.literal("Spy report filed: " + state.chunksRevealed()
                         + " areas surveyed" + (state.isDetected() ? " (compromised)" : " undetected") + "."),

@@ -56,6 +56,8 @@ public class NFSavedData extends SavedData {
         register(new com.netherfront.common.intel.IntelSystem());
         register(new com.netherfront.common.supply.SupplySystem());
         register(new com.netherfront.common.spy.SpySystem());
+        register(new com.netherfront.common.domination.DominationSystem());
+        register(new com.netherfront.common.stats.StatsSystem());
     }
 
     protected void register(NFSubsystem subsystem) {

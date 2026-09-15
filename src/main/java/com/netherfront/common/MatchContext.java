@@ -91,6 +91,18 @@ public final class MatchContext {
         data.addFeedEntry(teamId, category, message, pos, gameTime);
     }
 
+    /**
+     * Records a statistic for a team, if the statistics system is present.
+     * Kept here so callers never need to reach for the subsystem themselves.
+     */
+    public void stat(String teamId, com.netherfront.common.stats.StatKey key, int amount) {
+        com.netherfront.common.stats.StatsSystem stats =
+                data.sub(com.netherfront.common.stats.StatsSystem.class);
+        if (stats != null) {
+            stats.record(teamId, key, amount);
+        }
+    }
+
     /** Adds a feed line visible to every team. */
     public void feedAll(FeedCategory category, Component message, @Nullable BlockPos pos) {
         data.addFeedEntry(MatchTeam.NEUTRAL, category, message, pos, gameTime);

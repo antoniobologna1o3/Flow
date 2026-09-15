@@ -238,6 +238,7 @@ public final class MercenarySystem implements NFSubsystem, SnapshotContributor {
             }
         }
         level.playSound(null, camp.pos(), SoundEvents.VILLAGER_YES, SoundSource.NEUTRAL, 1.0F, 1.0F);
+        ctx.stat(teamId, com.netherfront.common.stats.StatKey.MERCENARIES_HIRED, 1);
         ctx.feedTeam(teamId, FeedCategory.MERCENARY,
                 Component.literal("Hired " + spawned + " " + camp.type().displayName() + "."),
                 camp.pos());

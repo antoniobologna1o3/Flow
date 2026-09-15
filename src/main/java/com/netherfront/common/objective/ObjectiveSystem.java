@@ -80,6 +80,10 @@ public final class ObjectiveSystem implements NFSubsystem, SnapshotContributor {
                 continue;
             }
             if (objective.isExpired(now)) {
+                // Only a team that actually started it counts as having failed.
+                for (String team : objective.progressMap().keySet()) {
+                    ctx.stat(team, com.netherfront.common.stats.StatKey.OBJECTIVES_FAILED, 1);
+                }
                 announce(ctx, objective, "Objective expired: " + objective.title(), false);
                 it.remove();
                 continue;
@@ -334,6 +338,7 @@ public final class ObjectiveSystem implements NFSubsystem, SnapshotContributor {
      */
     private void reward(MatchContext ctx, Objective objective) {
         String team = objective.completedByTeam();
+        ctx.stat(team, com.netherfront.common.stats.StatKey.OBJECTIVES_COMPLETED, 1);
         announce(ctx, objective, "Objective complete: " + objective.title(), false);
 
         for (ServerPlayer player : ctx.players()) {

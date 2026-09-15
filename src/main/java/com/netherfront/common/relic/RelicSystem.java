@@ -279,6 +279,7 @@ public final class RelicSystem implements NFSubsystem, SnapshotContributor, Infl
     }
 
     private void announceCapture(MatchContext ctx, RelicSite site, String team, String previous) {
+        ctx.stat(team, com.netherfront.common.stats.StatKey.RELICS_CAPTURED, 1);
         ctx.feedTeam(team, FeedCategory.RELIC,
                 Component.literal("Captured the " + site.type().displayName() + ". "
                         + site.type().description()), site.pos());
