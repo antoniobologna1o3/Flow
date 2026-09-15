@@ -75,9 +75,15 @@ public final class IntelSystem implements NFSubsystem, SnapshotContributor {
     public void tick(MatchContext ctx) {
         long now = ctx.gameTime();
 
+        // Tagged scouts and spies are gathered in a single pass over entities
+        // and bucketed by team. Doing this per team instead would sweep every
+        // entity in the world once for each side.
+        Map<String, List<VisionSource>> agentSources = collectAgentSources(ctx);
+
         for (var team : ctx.match().teamList()) {
             TeamIntel intel = intelFor(team.id());
             List<VisionSource> sources = collectVisionSources(ctx, team.id());
+            sources.addAll(agentSources.getOrDefault(team.id(), List.of()));
             for (VisionSource source : sources) {
                 applyVision(ctx, intel, source, now);
             }
@@ -108,21 +114,6 @@ public final class IntelSystem implements NFSubsystem, SnapshotContributor {
             if (ctx.match().teamIdOf(player.getUUID()).equals(teamId)) {
                 sources.add(new VisionSource(player.blockPosition(), level,
                         NFConfig.SERVER.baseUnitVisionChunks.get() + relicBonus));
-            }
-        }
-
-        if (ctx.enabled(NFSystem.SCOUTING)) {
-            for (ServerLevel level : ctx.server().getAllLevels()) {
-                for (Entity entity : level.getAllEntities()) {
-                    AgentRole role = AgentRole.of(entity);
-                    if (role == null || !AgentRole.teamOf(entity).equals(teamId)) {
-                        continue;
-                    }
-                    int radius = role == AgentRole.SCOUT
-                            ? NFConfig.SERVER.scoutVisionChunks.get()
-                            : NFConfig.SERVER.baseUnitVisionChunks.get();
-                    sources.add(new VisionSource(entity.blockPosition(), level, radius + relicBonus));
-                }
             }
         }
 
@@ -157,6 +148,41 @@ public final class IntelSystem implements NFSubsystem, SnapshotContributor {
             }
         }
         return sources;
+    }
+
+    /**
+     * One pass over all entities, bucketing tagged scouts and spies by the team
+     * that deployed them.
+     */
+    private Map<String, List<VisionSource>> collectAgentSources(MatchContext ctx) {
+        Map<String, List<VisionSource>> byTeamSources = new HashMap<>();
+        if (!ctx.enabled(NFSystem.SCOUTING)) {
+            return byTeamSources;
+        }
+        RelicSystem relics = ctx.sub(RelicSystem.class);
+        boolean relicsOn = relics != null && ctx.enabled(NFSystem.RELICS);
+
+        for (ServerLevel level : ctx.server().getAllLevels()) {
+            for (Entity entity : level.getAllEntities()) {
+                AgentRole role = AgentRole.of(entity);
+                if (role == null) {
+                    continue;
+                }
+                String team = AgentRole.teamOf(entity);
+                if (team.isEmpty() || MatchTeam.NEUTRAL.equals(team)) {
+                    continue;
+                }
+                int radius = role == AgentRole.SCOUT
+                        ? NFConfig.SERVER.scoutVisionChunks.get()
+                        : NFConfig.SERVER.baseUnitVisionChunks.get();
+                if (relicsOn) {
+                    radius += relics.visionBonusFor(team);
+                }
+                byTeamSources.computeIfAbsent(team, id -> new ArrayList<>())
+                        .add(new VisionSource(entity.blockPosition(), level, radius));
+            }
+        }
+        return byTeamSources;
     }
 
     private void applyVision(MatchContext ctx, TeamIntel intel, VisionSource source, long now) {

@@ -64,6 +64,9 @@ public final class EventDirector implements NFSubsystem, SnapshotContributor {
     private final List<WorldEventType> recent = new ArrayList<>();
     private final Map<WorldEventType, Long> lastRun = new EnumMap<>(WorldEventType.class);
     private long nextEventTick;
+    /** Start tick of the most recent event, kept after it ends so the
+     *  minimum gap still applies to the next one. */
+    private long lastEventStartTick;
 
     @Override
     public String key() {
@@ -117,10 +120,11 @@ public final class EventDirector implements NFSubsystem, SnapshotContributor {
         if (now < nextEventTick) {
             return;
         }
-        // Hard floor between events, regardless of frequency setting.
-        long lastStart = active.isEmpty() ? 0L
-                : active.get(active.size() - 1).startTick();
-        if (lastStart > 0L && now - lastStart < NFConfig.SERVER.eventMinGapTicks.get()) {
+        // Hard floor between events, regardless of frequency setting. This is
+        // measured from the last event's start whether or not it is still
+        // running, so back-to-back events cannot slip through once one ends.
+        if (lastEventStartTick > 0L
+                && now - lastEventStartTick < NFConfig.SERVER.eventMinGapTicks.get()) {
             schedule(ctx, now);
             return;
         }
@@ -184,6 +188,7 @@ public final class EventDirector implements NFSubsystem, SnapshotContributor {
                 UUID.randomUUID(), type, now, now + type.durationTicks(), focus);
         active.add(event);
 
+        lastEventStartTick = now;
         recent.add(type);
         while (recent.size() > HISTORY_SIZE) {
             recent.remove(0);
@@ -457,6 +462,7 @@ public final class EventDirector implements NFSubsystem, SnapshotContributor {
     public void save(CompoundTag tag) {
         tag.put("active", NbtUtils2.writeList(active, WorldEventInstance::save));
         tag.putLong("next", nextEventTick);
+        tag.putLong("lastStart", lastEventStartTick);
         CompoundTag recentTag = new CompoundTag();
         for (int i = 0; i < recent.size(); i++) {
             recentTag.putString("r" + i, recent.get(i).name());
@@ -469,6 +475,7 @@ public final class EventDirector implements NFSubsystem, SnapshotContributor {
         active.clear();
         active.addAll(NbtUtils2.readList(tag, "active", WorldEventInstance::load));
         nextEventTick = tag.getLong("next");
+        lastEventStartTick = tag.getLong("lastStart");
         recent.clear();
         CompoundTag recentTag = tag.getCompound("recent");
         for (String key : recentTag.getAllKeys()) {
@@ -486,5 +493,6 @@ public final class EventDirector implements NFSubsystem, SnapshotContributor {
         recent.clear();
         lastRun.clear();
         nextEventTick = 0L;
+        lastEventStartTick = 0L;
     }
 }

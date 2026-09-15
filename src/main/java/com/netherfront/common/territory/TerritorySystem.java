@@ -130,7 +130,7 @@ public final class TerritorySystem implements NFSubsystem, SnapshotContributor {
     }
 
     /** Linear falloff from full strength at the source to zero at the edge. */
-    static double contributionAt(InfluenceSource source, ChunkPos chunk) {
+    public static double contributionAt(InfluenceSource source, ChunkPos chunk) {
         ChunkPos origin = new ChunkPos(source.pos());
         double dx = chunk.x - origin.x;
         double dz = chunk.z - origin.z;
