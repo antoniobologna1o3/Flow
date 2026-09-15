@@ -116,6 +116,42 @@ public final class NFWorldEvents {
     }
 
     /**
+     * Suppresses regeneration for a player who is out of supply (section 5).
+     *
+     * <p>Forge's heal event does not say where the healing came from, so this
+     * matches on the amount: vanilla natural regeneration and the Regeneration
+     * effect both tick for 1.0, while potions and food heal more. That keeps
+     * drinking a healing potion working while cut off, which is the behaviour
+     * we want anyway - being unsupplied should be a drag, not a death sentence.
+     */
+    @SubscribeEvent
+    public static void onLivingHeal(net.minecraftforge.event.entity.living.LivingHealEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            return;
+        }
+        if (event.getAmount() > 1.0F) {
+            return;
+        }
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            return;
+        }
+        NFSavedData data = NFSavedData.get(server);
+        if (!data.match().isActive() || !data.match().settings().isEnabled(NFSystem.SUPPLY)) {
+            return;
+        }
+        String team = data.match().teamIdOf(player.getUUID());
+        if (MatchTeam.NEUTRAL.equals(team)) {
+            return;
+        }
+        com.netherfront.common.supply.SupplySystem supply =
+                data.sub(com.netherfront.common.supply.SupplySystem.class);
+        if (supply != null && supply.blocksRegenFor(player, team)) {
+            event.setCanceled(true);
+        }
+    }
+
+    /**
      * Village reputation reacts to who kills what near a village (section 8).
      * Only kills credited to a player count, so mobs fighting each other do not
      * quietly shift a village's loyalty.
