@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "netherfront:block/supply_depot" }
+  }
+}

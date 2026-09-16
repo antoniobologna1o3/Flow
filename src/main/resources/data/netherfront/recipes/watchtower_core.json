@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [ "SGS", "SLS", "SSS" ],
+  "key": {
+    "S": { "item": "minecraft:stone_bricks" },
+    "G": { "item": "minecraft:glass" },
+    "L": { "item": "minecraft:lantern" }
+  },
+  "result": { "item": "netherfront:watchtower_core", "count": 1 }
+}
